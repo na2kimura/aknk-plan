@@ -1014,8 +1014,8 @@ export default function App() {
                 })()}
                 {catSummary.map(([cat,t],i)=>(
                   <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<catSummary.length-1?"1px solid #f0f0f0":"none",fontSize:13}}>
-                    <span style={{color:isTransportCat(cat)?"#666":"#555",paddingLeft:isTransportCat(cat)?8:0}}>{cat}</span>
-                    <span style={{fontWeight:700}}>{fmt(t)}</span>
+                    <span style={{color:"#555",paddingLeft:isTransportCat(cat)?16:0}}>{cat}</span>
+                    <span style={{fontWeight:isTransportCat(cat)?400:700,color:isTransportCat(cat)?"#888":"#333"}}>{fmt(t)}</span>
                   </div>
                 ))}
                 <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0 0",marginTop:4,borderTop:"2px solid #eee",fontWeight:700,fontSize:14}}>
