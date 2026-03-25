@@ -785,7 +785,7 @@ export default function App() {
               <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee"}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16,marginBottom:6}}><span>合計</span><span style={{color:GREEN}}>{fmt(totalOf(selDate.items||[]))}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                  {USERS.map(u=>{const t=paidByUser(selDate.items||[],u);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                  {[["Nk","Natsuki"],["Ak","Akira"],["折半",null]].map(([u,alt])=>{const t=paidByUser(selDate.items||[],u,alt);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                 </div>
               </div>
             </div>
@@ -1007,7 +1007,7 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{fontWeight:500}}>{d.title}</span><span style={{fontWeight:700}}>{fmt(dispTotal)}</span></div>
                     <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
                       <span style={{fontSize:11,color:"#aaa"}}>{d.date}</span>
-                      {filterCat==="すべて"&&USERS.map(u=>{const t=paidByUser(d.items||[],u);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                      {filterCat==="すべて"&&[["Nk","Natsuki"],["Ak","Akira"],["折半",null]].map(([u,alt])=>{const t=paidByUser(d.items||[],u,alt);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                     </div>
                   </div>
                 );
