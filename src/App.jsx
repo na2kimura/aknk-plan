@@ -216,11 +216,11 @@ async function geocode(q) {
 function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"88px 1fr 68px 70px 18px",gap:4,marginBottom:4}}>
+      <div style={{display:"grid",gridTemplateColumns:"80px 1fr 62px 64px 18px",gap:3,marginBottom:4}}>
         {["カテゴリ","内容","金額","支払者",""].map((h,i)=><span key={i} style={{fontSize:11,color:"#aaa"}}>{h}</span>)}
       </div>
       {rows.map(row => (
-        <div key={row.id} style={{display:"grid",gridTemplateColumns:"88px 1fr 68px 70px 18px",gap:4,marginBottom:5,alignItems:"center"}}>
+        <div key={row.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 62px 64px 18px",gap:3,marginBottom:5,alignItems:"center"}}>
           <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px"}}>
             {EXPENSE_CATS.map(c=><option key={c}>{c}</option>)}
           </select>
@@ -240,7 +240,7 @@ function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
 
 function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
   return (
-    <div>
+    <div style={{width:"100%",minWidth:0}}>
       {spots.map((spot,i) => (
         <div key={spot.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee"}}>
           <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
@@ -270,36 +270,36 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
 
 function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) {
   return (
-    <div>
+    <div style={{width:"100%",minWidth:0}}>
       {rows.map((row,i) => {
         const trans = isTransport(row.cat), ret = isReturn(row.cat);
         return (
-          <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee"}}>
-            <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
+          <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee",minWidth:0,boxSizing:"border-box"}}>
+            <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,minWidth:0}}>
               <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
                 <button onClick={()=>onMove(i,-1)} disabled={i===0} style={{background:"none",border:"none",color:i===0?"#ddd":"#aaa",cursor:i===0?"default":"pointer",padding:"0 2px",fontSize:12,lineHeight:1}}>▲</button>
                 <button onClick={()=>onMove(i,1)} disabled={i===rows.length-1} style={{background:"none",border:"none",color:i===rows.length-1?"#ddd":"#aaa",cursor:i===rows.length-1?"default":"pointer",padding:"0 2px",fontSize:12,lineHeight:1}}>▼</button>
               </div>
-              <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px",flexShrink:0}}>
+              <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px",flexShrink:0,maxWidth:120}}>
                 {SCHEDULE_CATS.map(c=><option key={c}>{c}</option>)}
               </select>
-              <input value={row.content} onChange={e=>onUpdate(row.id,"content",e.target.value)} placeholder="内容" style={{...SI,flex:1}}/>
+              <input value={row.content} onChange={e=>onUpdate(row.id,"content",e.target.value)} placeholder="内容" style={{...SI,flex:1,minWidth:0}}/>
               <button onClick={()=>onRemove(row.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:16,cursor:"pointer",padding:0,flexShrink:0}}>×</button>
             </div>
             {!trans && (
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   <input type="time" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:90,flexShrink:0}}/>
-                  <div style={{display:"flex",alignItems:"center",gap:3}}>
+                  <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,width:80,textAlign:"right"}}/>
+                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right"}}/>
                   </div>
                 </div>
-                <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%"}}/>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所を入力すると地図にピンが立ちます" style={{...SI,flex:1}}/>
+                <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%",boxSizing:"border-box"}}/>
+                <div style={{display:"flex",gap:6,alignItems:"center",minWidth:0}}>
+                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所を入力すると地図にピンが立ちます" style={{...SI,flex:1,minWidth:0}}/>
                   <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={row.searching||(!row.place&&!row.content&&!row.address)}
-                    style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
+                    style={{padding:"7px 8px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:11,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
                     {row.searching ? "検索中…" : row.lat ? "再取得" : "地図取得"}
                   </button>
                 </div>
@@ -308,16 +308,16 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) 
               </div>
             )}
             {trans && (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,minWidth:0,overflow:"hidden"}}>
                 {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label]) => (
-                  <div key={who} style={{background:"#fff",borderRadius:8,padding:"8px 10px",border:`1px solid ${USER_COLORS[label]}33`}}>
+                  <div key={who} style={{background:"#fff",borderRadius:8,padding:"8px 8px",border:`1px solid ${USER_COLORS[label]}33`,minWidth:0,overflow:"hidden",boxSizing:"border-box"}}>
                     <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                    <input type="time" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5}}/>
+                    <input type="time" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12}}/>
                     <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
-                      placeholder={ret?"目的地（例: 福井駅）":"出発地（例: 福井駅）"} style={{...SI,width:"100%",marginBottom:5}}/>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                      <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right"}}/>
+                      placeholder={ret?"目的地":"出発地"} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12}}/>
+                    <div style={{display:"flex",alignItems:"center",gap:3,minWidth:0}}>
+                      <span style={{fontSize:10,color:"#aaa",flexShrink:0}}>予算¥</span>
+                      <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right",minWidth:0,boxSizing:"border-box",fontSize:12}}/>
                     </div>
                   </div>
                 ))}
@@ -459,7 +459,9 @@ export default function App() {
     return filtered.reduce((s,d)=>s+(d.items||[]).filter(i=>i.cat===filterCat).reduce((ss,i)=>ss+(Number(i.amount)||0),0),0);
   },[filtered,filterCat,filteredTot]);
 
-  const planSpots = (plan) => (plan.schedule||[]).filter(s=>s.place||s.content).map((s,i)=>({id:s.id||i,name:s.place||s.content||"スポット",address:s.address||""}));
+  const planSpots = (plan) => (plan.schedule||[])
+    .filter(s => !isTransport(s.cat) && (s.place||s.content))
+    .map((s,i) => ({id:s.id||i, name:s.place||s.content||"スポット", address:s.address||"", lat:s.lat||"", lng:s.lng||""}));
 
   // ── Date form ──
   const openAddDate = () => {
@@ -941,7 +943,7 @@ export default function App() {
       {/* ADD/EDIT DATE MODAL */}
       {showAddDate&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",zIndex:1000}}>
-          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",height:"88vh",display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",overflow:"hidden",height:"88vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"1.25rem 1.25rem 1rem",borderBottom:"1px solid #eee",flexShrink:0}}>
               <p style={{margin:"0 0 0.75rem",fontWeight:700,fontSize:16}}>{editDateId?"デートを編集":"新しいデートを記録"}</p>
               <div style={{display:"flex",gap:10}}>
@@ -949,7 +951,7 @@ export default function App() {
                 <div style={{flex:1}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>日付 *</label><input type="date" value={ndDate} onChange={e=>setNdDate(e.target.value)} style={INP}/></div>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",padding:"1rem 1.25rem"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ</label><textarea value={ndMemo} onChange={e=>setNdMemo(e.target.value)} placeholder="思い出メモ..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <div style={{marginBottom:14}}>
                 <p style={{margin:"0 0 6px",fontWeight:700,fontSize:14}}>訪れた場所</p>
@@ -976,7 +978,7 @@ export default function App() {
       {/* ADD/EDIT PLAN MODAL */}
       {showAddPlan&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",zIndex:1000}}>
-          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",height:"88vh",display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",overflow:"hidden",height:"88vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"1.25rem 1.25rem 1rem",borderBottom:"1px solid #eee",flexShrink:0}}>
               <p style={{margin:"0 0 0.75rem",fontWeight:700,fontSize:16}}>{editPlanId?"計画を編集":"デート計画を追加"}</p>
               <div style={{display:"flex",gap:10}}>
@@ -984,7 +986,7 @@ export default function App() {
                 <div style={{flex:1}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>予定日 *</label><input type="date" value={npDate} onChange={e=>setNpDate(e.target.value)} style={INP}/></div>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",padding:"1rem 1.25rem"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ・アイデア</label><textarea value={npMemo} onChange={e=>setNpMemo(e.target.value)} placeholder="行きたいお店やアイデアなど..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
               <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched}/>
@@ -1001,12 +1003,12 @@ export default function App() {
       {/* BULK MODAL */}
       {showBulk&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",zIndex:1000}}>
-          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",height:"80vh",display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",overflow:"hidden",height:"80vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"1.25rem 1.25rem 1rem",borderBottom:"1px solid #eee",flexShrink:0}}>
               <p style={{margin:"0 0 4px",fontWeight:700,fontSize:16}}>費用を一括入力</p>
               <p style={{margin:0,fontSize:12,color:"#888"}}>金額を入力した行だけ追加されます</p>
             </div>
-            <div style={{flex:1,overflowY:"auto",padding:"1rem 1.25rem"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
               <RowEditor rows={bulkRows} onUpdate={bkUpd} onAdd={()=>setBulkRows(p=>[...p,makeRow(Date.now())])} onRemove={id=>setBulkRows(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700,color:GREEN,margin:"10px 0 8px",paddingTop:10,borderTop:"2px solid #eee"}}><span>合計</span><span>{fmt(totalOf(bulkRows))}</span></div>
             </div>
