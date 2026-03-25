@@ -306,7 +306,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
             {!trans && (
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input type="time" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box"}}/>
+                  <input type="time" step="900" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box"}}/>
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
                     <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
@@ -329,7 +329,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
                 {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label]) => (
                   <div key={who} style={{background:"#fff",borderRadius:8,padding:"8px 8px",border:`1px solid ${USER_COLORS[label]}33`,minWidth:0,overflow:"hidden",boxSizing:"border-box"}}>
                     <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                    <input type="time" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12,minWidth:0}}/>
+                    <input type="time" step="60" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:11,padding:"6px 4px",minWidth:0}}/>
                     <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
                       placeholder={ret?"目的地":"出発地"} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12,minWidth:0}}/>
                     <div style={{display:"flex",alignItems:"center",gap:3,minWidth:0}}>
