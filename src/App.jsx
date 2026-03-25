@@ -222,7 +222,7 @@ async function geocode(q) {
   return null;
 }
 
-function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
+function RowEditor({ rows, onUpdate, onAdd, onRemove, defaultPaidBy }) {
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"80px 1fr 80px 46px 18px",gap:3,marginBottom:4}}>
@@ -242,7 +242,7 @@ function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
           <button onClick={()=>onRemove(row.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:16,cursor:"pointer",padding:0}}>×</button>
         </div>
       ))}
-      <button onClick={onAdd} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px dashed #ddd",background:"transparent",cursor:"pointer",fontSize:12,color:"#888",marginTop:2}}>+ 行を追加</button>
+      <button onClick={()=>onAdd(defaultPaidBy||"Nk")} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px dashed #ddd",background:"transparent",cursor:"pointer",fontSize:12,color:"#888",marginTop:2}}>+ 行を追加</button>
     </div>
   );
 }
@@ -514,7 +514,7 @@ export default function App() {
   // ── Date form ──
   const openAddDate = () => {
     setEditDateId(null); setNdTitle(""); setNdDate(""); setNdMemo("");
-    setNdItems(Array.from({length:5},(_,i)=>makeRow(i+1)));
+    setNdItems(Array.from({length:3},(_,i)=>({...makeRow(i+1),paidBy:currentUserName})));
     setPartnerItems([]);
     setNdSpots([makeSpot(1)]); setNdPhotos([]); setShowAddDate(true);
   };
@@ -524,7 +524,7 @@ export default function App() {
     // 自分の行は編集可、相手の行は表示のみ
     const myItems = allItems.filter(it => it.paidBy === currentUserName);
     const otherItems = allItems.filter(it => it.paidBy === partnerName);
-    setNdItems(myItems.length ? myItems : Array.from({length:3},(_,i)=>makeRow(i+1)));
+    setNdItems(myItems.length ? myItems : Array.from({length:3},(_,i)=>({...makeRow(i+1),paidBy:currentUserName})));
     setPartnerItems(otherItems);
     setNdSpots((d.spots||[]).length ? d.spots.map(s=>({...s})) : [makeSpot(1)]);
     setNdPhotos(d.photos ? [...d.photos] : []);
@@ -535,7 +535,6 @@ export default function App() {
     if(!ndTitle||!ndDate) return;
     setSaving(true);
     const myValidItems = ndItems.filter(i => i.amount !== "" && Number(i.amount) > 0).map(i=>({...i,amount:Number(i.amount)}));
-    // パートナーのアイテムも保持（amount数値に戻す）
     const partnerValidItems = partnerItems.map(i=>({...i,amount:Number(i.amount)}));
     const validItems = [...myValidItems, ...partnerValidItems];
     const validSpots = ndSpots.filter(s => s.name);
@@ -548,6 +547,7 @@ export default function App() {
         const ref = await addDoc(collection(db,"dates"), data);
         setDates(p=>[{...data,id:ref.id},...p].sort((a,b)=>b.date.localeCompare(a.date)));
       }
+      setPartnerItems([]);
     } catch(e) { alert("保存に失敗しました: "+e.message); }
     setSaving(false); setShowAddDate(false); setEditDateId(null);
   };
@@ -1056,7 +1056,7 @@ export default function App() {
               )}
               {/* 自分のアイテム（編集可） */}
               <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>{currentUserName}の入力分</p>
-              <RowEditor rows={ndItems} onUpdate={ndUpdRow} onAdd={()=>setNdItems(p=>[...p,makeRow(Date.now())])} onRemove={id=>setNdItems(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
+              <RowEditor rows={ndItems} onUpdate={ndUpdRow} onAdd={(paidBy)=>setNdItems(p=>[...p,{...makeRow(Date.now()),paidBy}])} onRemove={id=>setNdItems(p=>p.length>1?p.filter(r=>r.id!==id):p)} defaultPaidBy={currentUserName}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>合計: {fmt(totalOf([...ndItems,...partnerItems]))}</div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
