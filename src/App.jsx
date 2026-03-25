@@ -75,57 +75,33 @@ function LoginScreen({ onLogin, error, loading }) {
 
 // ── Map ──
 function SpotMap({ spots }) {
-  const ref = useRef(null), inst = useRef(null);
-  // lat/lngあり → 地図に表示
-  const withCoords = spots.filter(s => s.lat && s.lng && s.name);
-  // 場所名だけでもリスト表示（lat/lngなくてもOK）
   const allNamed = spots.filter(s => s.name);
-
-  useEffect(() => {
-    if (!ref.current || !withCoords.length) return;
-    const init = () => {
-      try {
-        if (inst.current) { inst.current.remove(); inst.current = null; }
-        if (!ref.current) return;
-        ref.current._leaflet_id = null;
-        const L = window.L;
-        const cx = withCoords.length === 1 ? [withCoords[0].lat, withCoords[0].lng]
-          : [withCoords.reduce((s,sp)=>s+sp.lat,0)/withCoords.length, withCoords.reduce((s,sp)=>s+sp.lng,0)/withCoords.length];
-        const map = L.map(ref.current).setView(cx, withCoords.length===1?14:12);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
-        // マーカーの番号はallNamedの中での順番に合わせる
-        withCoords.forEach((sp) => {
-          const idx = allNamed.findIndex(s => s.id === sp.id || s.name === sp.name);
-          const num = idx >= 0 ? idx + 1 : "•";
-          const icon = L.divIcon({ html:`<div style="background:${GREEN};color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.2)">${num}</div>`, className:"", iconSize:[26,26], iconAnchor:[13,13] });
-          L.marker([sp.lat,sp.lng],{icon}).addTo(map).bindPopup(`<b>${sp.name}</b><br><a href="https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}" target="_blank" style="color:${GREEN};font-size:12px">Googleマップで開く</a>`);
-        });
-        if (withCoords.length > 1) map.fitBounds(L.latLngBounds(withCoords.map(sp=>[sp.lat,sp.lng])),{padding:[30,30]});
-        inst.current = map;
-      } catch(e) { console.error("Map init error:", e); }
-    };
-    if (!document.getElementById("lf-css")) { const lk=document.createElement("link");lk.id="lf-css";lk.rel="stylesheet";lk.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(lk); }
-    window.L ? init() : (() => { if (!document.getElementById("lf-js")) { const sc=document.createElement("script");sc.id="lf-js";sc.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";sc.onload=()=>setTimeout(init,50);document.head.appendChild(sc); } else setTimeout(init,200); })();
-    return () => { try { if (inst.current) { inst.current.remove(); inst.current=null; } } catch(e){} };
-  }, [JSON.stringify(withCoords)]);
-
   if (!allNamed.length) return null;
+
+  // 複数地点のGoogleマップルートURL生成
+  // 住所があれば住所、なければ場所名を使う
+  const toQuery = (sp) => encodeURIComponent(sp.address || sp.name);
+  const routeUrl = allNamed.length === 1
+    ? `https://www.google.com/maps/search/?api=1&query=${toQuery(allNamed[0])}`
+    : `https://www.google.com/maps/dir/${allNamed.map(toQuery).join("/")}`;
+
   return (
     <div>
-      {/* 座標がある場合のみ地図を表示 */}
-      {withCoords.length > 0 && (
-        <div ref={ref} style={{width:"100%",height:200,borderRadius:10,overflow:"hidden",border:"1px solid #eee",marginBottom:8}}/>
-      )}
+      {/* 全スポットまとめてGoogleマップで開くボタン */}
+      <a href={routeUrl} target="_blank" rel="noreferrer"
+        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",padding:"10px",borderRadius:10,background:"#e8f5f0",border:`1px solid ${GREEN}33`,color:GREEN,fontWeight:700,fontSize:13,textDecoration:"none",marginBottom:8,boxSizing:"border-box"}}>
+        <span>🗺️</span>
+        <span>{allNamed.length === 1 ? "Googleマップで開く" : `${allNamed.length}ヶ所のルートをGoogleマップで開く`}</span>
+        <span style={{fontSize:11}}>→</span>
+      </a>
+      {/* 個別リスト */}
       <div style={{display:"flex",flexDirection:"column",gap:4}}>
         {allNamed.map((sp,i) => {
-          // lat/lngがある場合は座標検索リンク、ない場合は場所名検索リンク
-          const mapUrl = sp.lat && sp.lng
-            ? `https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}`
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.name)}`;
+          const url = `https://www.google.com/maps/search/?api=1&query=${toQuery(sp)}`;
           return (
-            <a key={i} href={mapUrl} target="_blank" rel="noreferrer"
+            <a key={i} href={url} target="_blank" rel="noreferrer"
               style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",textDecoration:"none",padding:"5px 8px",borderRadius:7,background:"#f7f7f7"}}>
-              <span style={{background:sp.lat?GREEN:"#bbb",color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
+              <span style={{background:GREEN,color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
               <span style={{flex:1}}>{sp.name}</span>
               <span style={{fontSize:11,color:GREEN}}>Gマップ</span>
             </a>
@@ -138,9 +114,9 @@ function SpotMap({ spots }) {
 
 async function geocode(q) {
   const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
-  const fetchWithTimeout = async (url, ms = 7000) => Promise.race([fetch(url), timeout(ms)]);
+  const fetchWithTimeout = async (url, ms = 8000) => Promise.race([fetch(url), timeout(ms)]);
 
-  // ① 郵便番号が含まれる場合: zipcloud で住所に変換してからクエリに追加
+  // ① 郵便番号が含まれる場合: zipcloud で住所に変換
   const zipMatch = q.replace(/[〒\s　]/g, "").match(/(\d{3})-?(\d{4})/);
   if (zipMatch) {
     const zip = zipMatch[1] + zipMatch[2];
@@ -150,7 +126,6 @@ async function geocode(q) {
         const d = await r.json();
         if (d?.results?.[0]) {
           const base = d.results[0].address1 + d.results[0].address2 + d.results[0].address3;
-          // 住所変換成功 → 番地部分を郵便番号より後ろから取り出して結合
           const after = q.replace(/[〒\s　]/g,"").replace(/\d{3}-?\d{4}/, "").trim();
           q = base + after;
         }
@@ -158,23 +133,14 @@ async function geocode(q) {
     } catch {}
   }
 
-  // ② Nominatim メイン（日本住所・施設名）
-  try {
-    const r = await fetchWithTimeout(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5&accept-language=ja`,
-      7000
-    );
-    if (r.ok) {
-      const d = await r.json();
-      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-    }
-  } catch {}
+  // 番地・号を除いた短縮クエリを作成（例:「石川県小松市清六町315番地」→「石川県小松市清六町」）
+  const qShort = q.replace(/\d+番(地|丁目)?/, "").replace(/\d+号/, "").trim();
 
-  // ③ photon.komoot（施設名・店舗名に強い）、日本に絞って検索
+  // ② photon（施設名・店舗名に強い）- 日本のbboxで絞る
   try {
     const r = await fetchWithTimeout(
       `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&lang=ja&bbox=122,24,154,46`,
-      6000
+      7000
     );
     if (r.ok) {
       const d = await r.json();
@@ -186,11 +152,55 @@ async function geocode(q) {
     }
   } catch {}
 
-  // ④ Nominatim 再試行（「日本」付き）
+  // ③ Nominatim（住所検索）- フルクエリ
+  try {
+    const r = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5&accept-language=ja`,
+      8000
+    );
+    if (r.ok) {
+      const d = await r.json();
+      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+    }
+  } catch {}
+
+  // ④ Nominatim - 番地を除いた短縮クエリで再試行
+  if (qShort !== q) {
+    try {
+      const r = await fetchWithTimeout(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qShort)}&countrycodes=jp&limit=5&accept-language=ja`,
+        8000
+      );
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+      }
+    } catch {}
+  }
+
+  // ⑤ photon - 短縮クエリで再試行
+  if (qShort !== q) {
+    try {
+      const r = await fetchWithTimeout(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(qShort)}&limit=10&lang=ja&bbox=122,24,154,46`,
+        7000
+      );
+      if (r.ok) {
+        const d = await r.json();
+        const jp = d?.features?.find(f =>
+          f.properties?.country === "Japan" || f.properties?.country === "日本"
+        );
+        const f = jp || d?.features?.[0];
+        if (f) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+      }
+    } catch {}
+  }
+
+  // ⑥ 最終フォールバック: 「日本」付きで Nominatim
   try {
     const r = await fetchWithTimeout(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + " 日本")}&limit=1&accept-language=ja`,
-      7000
+      8000
     );
     if (r.ok) {
       const d = await r.json();
@@ -248,7 +258,7 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove, searc
             </button>
           </div>
           {spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:GREEN,paddingLeft:32}}>✓ 取得済</p>}
-          {spot.geoError && !spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:"#E24B4A",paddingLeft:32}}>取得できませんでした。住所をより詳しく入力してください。</p>}
+          {spot.geoError && !spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:"#E24B4A",paddingLeft:32}}>取得できませんでした。住所欄に「石川県小松市清六町」のように都道府県〜町名で入力すると取得しやすくなります。</p>}
         </div>
       ))}
       <button onClick={onAdd} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",marginTop:2}}>+ 場所を追加</button>
@@ -447,7 +457,7 @@ export default function App() {
     return filtered.reduce((s,d)=>s+(d.items||[]).filter(i=>i.cat===filterCat).reduce((ss,i)=>ss+(Number(i.amount)||0),0),0);
   },[filtered,filterCat,filteredTot]);
 
-  const planSpots = (plan) => (plan.schedule||[]).filter(s=>s.lat&&s.lng).map((s,i)=>({id:s.id||i,name:s.place||s.content||"スポット",lat:s.lat,lng:s.lng}));
+  const planSpots = (plan) => (plan.schedule||[]).filter(s=>s.place||s.content).map((s,i)=>({id:s.id||i,name:s.place||s.content||"スポット",address:s.address||""}));
 
   // ── Date form ──
   const openAddDate = () => {
