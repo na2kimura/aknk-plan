@@ -571,24 +571,6 @@ export default function App() {
     setPlans(p=>p.map(pl=>pl.id===planId?{...pl,status:"実行済み"}:pl));
   };
 
-  const deleteDate = async (dateId) => {
-    if(!window.confirm("このデート記録を削除しますか？")) return;
-    try {
-      await deleteDoc(doc(db,"dates",dateId));
-      setDates(p=>p.filter(d=>d.id!==dateId));
-      setSelDateId(null);
-    } catch(e) { alert("削除に失敗しました: "+e.message); }
-  };
-
-  const deletePlan = async (planId) => {
-    if(!window.confirm("この計画を削除しますか？")) return;
-    try {
-      await deleteDoc(doc(db,"plans",planId));
-      setPlans(p=>p.filter(pl=>pl.id!==planId));
-      setSelPlanId(null);
-    } catch(e) { alert("削除に失敗しました: "+e.message); }
-  };
-
   const bkUpd = (id,f,v) => setBulkRows(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
   const saveBulk = async () => {
     const valid=bulkRows.filter(r=>r.amount!==""&&Number(r.amount)>0).map(r=>({...r,amount:Number(r.amount)}));
@@ -740,7 +722,6 @@ export default function App() {
               <button onClick={()=>openEditDate(selDate)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",color:"#555",fontWeight:700,fontSize:14,cursor:"pointer"}}>編集する</button>
               <button onClick={()=>deleteDate(selDate.id)} style={{padding:"12px 16px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff8f8",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除</button>
             </div>
-            <button onClick={()=>deleteDate(selDate.id)} style={{width:"100%",marginTop:"0.5rem",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除する</button>
           </div>
         )}
 
@@ -864,7 +845,6 @@ export default function App() {
               {selPlan.status==="計画中"&&<button onClick={()=>markDone(selPlan.id)} style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${GREEN}`,background:"#fff",color:GREEN,fontWeight:700,fontSize:14,cursor:"pointer"}}>実行済みにする</button>}
               <button onClick={()=>deletePlan(selPlan.id)} style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff8f8",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除</button>
             </div>
-            <button onClick={()=>deletePlan(selPlan.id)} style={{width:"100%",marginTop:"0.5rem",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除する</button>
           </div>
         )}
 
