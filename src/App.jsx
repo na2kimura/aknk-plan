@@ -22,9 +22,11 @@ import {
 } from "firebase/storage";
 
 const GREEN = "#1D9E75";
-const USERS = ["Natsuki", "Akira", "折半"];
+const USERS = ["Nk", "Ak", "折半"];
 const EXPENSE_CATS = ["飛行機", "電車", "その他交通費", "食事", "宿泊", "体験", "その他"];
-const USER_COLORS = { Natsuki: "#D4537E", Akira: "#378ADD", 折半: "#888" };
+const USER_COLORS = { Nk: "#D4537E", Ak: "#378ADD", 折半: "#888", Natsuki: "#D4537E", Akira: "#378ADD" };
+// 旧データ(Natsuki/Akira)→新表示名(Nk/Ak)変換
+const toDisplayUser = (u) => u === "Natsuki" ? "Nk" : u === "Akira" ? "Ak" : u;
 const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観光", "食事", "宿泊", "体験", "休憩", "その他"];
 
 const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "折半" });
@@ -33,7 +35,7 @@ const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransport(r.cat) ? s + (Number(r.natsuki?.budget)||0) + (Number(r.akira?.budget)||0) : s + (Number(r.budget)||0), 0);
-const paidByUser = (items, u) => items.filter(i => i.paidBy === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
+const paidByUser = (items, u, alt) => items.filter(i => i.paidBy === u || (alt && i.paidBy === alt)).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
 const getY       = (d) => d.slice(0, 4);
@@ -216,18 +218,18 @@ async function geocode(q) {
 function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"80px 1fr 62px 64px 18px",gap:3,marginBottom:4}}>
-        {["カテゴリ","内容","金額","支払者",""].map((h,i)=><span key={i} style={{fontSize:11,color:"#aaa"}}>{h}</span>)}
+      <div style={{display:"grid",gridTemplateColumns:"80px 1fr 80px 46px 18px",gap:3,marginBottom:4}}>
+        {["カテゴリ","内容","金額","払者",""].map((h,i)=><span key={i} style={{fontSize:11,color:"#aaa"}}>{h}</span>)}
       </div>
       {rows.map(row => (
-        <div key={row.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 62px 64px 18px",gap:3,marginBottom:5,alignItems:"center"}}>
+        <div key={row.id} style={{display:"grid",gridTemplateColumns:"80px 1fr 80px 46px 18px",gap:3,marginBottom:5,alignItems:"center"}}>
           <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px"}}>
             {EXPENSE_CATS.map(c=><option key={c}>{c}</option>)}
           </select>
           <input value={row.note} placeholder={row.cat==="その他"?"内容を入力":"補足（任意）"} onChange={e=>onUpdate(row.id,"note",e.target.value)}
             style={{...SI,background:row.cat==="その他"?"#fffbe6":"#fff",borderColor:row.cat==="その他"&&!row.note?"#f0c040":"#ddd"}}/>
           <input type="number" value={row.amount} placeholder="0" onChange={e=>onUpdate(row.id,"amount",e.target.value)} style={{...SI,textAlign:"right"}}/>
-          <select value={row.paidBy} onChange={e=>onUpdate(row.id,"paidBy",e.target.value)} style={{...SI,padding:"7px 4px",color:USER_COLORS[row.paidBy]}}>
+          <select value={row.paidBy} onChange={e=>onUpdate(row.id,"paidBy",e.target.value)} style={{...SI,padding:"7px 2px",color:USER_COLORS[row.paidBy],fontSize:12}}>
             {USERS.map(u=><option key={u}>{u}</option>)}
           </select>
           <button onClick={()=>onRemove(row.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:16,cursor:"pointer",padding:0}}>×</button>
@@ -306,16 +308,19 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
             {!trans && (
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <select value={row.time||""} onChange={e=>onUpdate(row.id,"time",e.target.value)}
-                    style={{...SI,width:100,flexShrink:0,boxSizing:"border-box",fontSize:13}}>
-                    <option value="">--:--</option>
-                    {Array.from({length:96},(_,i)=>{
-                      const h=String(Math.floor(i/4)).padStart(2,"0");
-                      const m=String((i%4)*15).padStart(2,"0");
-                      const v=`${h}:${m}`;
-                      return <option key={v} value={v}>{v}</option>;
-                    })}
-                  </select>
+                  <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
+                    <select value={row.time ? row.time.split(":")[0] : ""} onChange={e=>{const m=row.time?row.time.split(":")[1]||"00":"00";onUpdate(row.id,"time",e.target.value?`${e.target.value}:${m}`:"");}}
+                      style={{...SI,width:56,padding:"7px 4px",boxSizing:"border-box",fontSize:13}}>
+                      <option value="">--</option>
+                      {Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,"0")}>{String(i).padStart(2,"0")}</option>)}
+                    </select>
+                    <span style={{fontSize:13,color:"#888"}}>:</span>
+                    <select value={row.time ? row.time.split(":")[1]||"00" : ""} onChange={e=>{const h=row.time?row.time.split(":")[0]||"00":"00";onUpdate(row.id,"time",row.time||h?`${h||"00"}:${e.target.value}`:"");}}
+                      style={{...SI,width:52,padding:"7px 4px",boxSizing:"border-box",fontSize:13}}>
+                      <option value="">--</option>
+                      {["00","15","30","45"].map(m=><option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
                     <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
@@ -468,8 +473,11 @@ export default function App() {
   },[dates]);
 
   const userTotals = useMemo(()=>{
-    const res={Natsuki:0,Akira:0,折半:0};
-    dates.forEach(d=>(d.items||[]).forEach(i=>{res[i.paidBy]=(res[i.paidBy]||0)+(Number(i.amount)||0);}));
+    const res={Nk:0,Ak:0,折半:0};
+    dates.forEach(d=>(d.items||[]).forEach(i=>{
+      const key = toDisplayUser(i.paidBy);
+      res[key]=(res[key]||0)+(Number(i.amount)||0);
+    }));
     return res;
   },[dates]);
 
@@ -663,7 +671,7 @@ export default function App() {
                   <span style={{fontSize:12,color:"#888"}}>{d.count}回</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                  {[{l:"合計費用",v:fmt(d.total),c:"#888"},{l:"Natsuki",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Natsuki"),0)),c:USER_COLORS.Natsuki},{l:"Akira",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Akira"),0)),c:USER_COLORS.Akira}].map(s=>(
+                  {[{l:"合計費用",v:fmt(d.total),c:"#888"},{l:"Nk",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Nk","Natsuki"),0)),c:USER_COLORS.Nk},{l:"Ak",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Ak","Akira"),0)),c:USER_COLORS.Ak}].map(s=>(
                     <div key={s.l} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
                       <p style={{margin:0,fontSize:10,color:s.c}}>{s.l}</p>
                       <p style={{margin:"3px 0 0",fontWeight:700,fontSize:14}}>{s.v}</p>
@@ -750,7 +758,7 @@ export default function App() {
               {(selDate.items||[]).map((item,i)=>(
                 <div key={item.id||i} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"4px 12px",padding:"7px 0",borderBottom:i<selDate.items.length-1?"1px solid #f0f0f0":"none",alignItems:"center"}}>
                   <span style={{fontSize:14}}>{itemLabel(item)}</span>
-                  <span style={{fontSize:11,padding:"1px 7px",borderRadius:20,background:(USER_COLORS[item.paidBy]||"#888")+"22",color:USER_COLORS[item.paidBy]||"#888",whiteSpace:"nowrap"}}>{item.paidBy}</span>
+                  <span style={{fontSize:11,padding:"1px 7px",borderRadius:20,background:(USER_COLORS[item.paidBy]||"#888")+"22",color:USER_COLORS[item.paidBy]||"#888",whiteSpace:"nowrap"}}>{toDisplayUser(item.paidBy)}</span>
                   <span style={{fontWeight:500,fontSize:14,textAlign:"right"}}>{fmt(item.amount)}</span>
                 </div>
               ))}
