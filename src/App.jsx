@@ -138,14 +138,31 @@ function SpotMap({ spots }) {
 
 async function geocode(q) {
   const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
-  const fetchWithTimeout = async (url, ms = 6000) => Promise.race([fetch(url), timeout(ms)]);
+  const fetchWithTimeout = async (url, ms = 7000) => Promise.race([fetch(url), timeout(ms)]);
 
-  // Nominatim（OpenStreetMap）をメインに使用 - 日本語の場所名・施設名に強い
-  // countrycodes=jp で日本限定、accept-language=ja で日本語優先
+  // ① 郵便番号が含まれる場合: zipcloud で住所に変換してからクエリに追加
+  const zipMatch = q.replace(/[〒\s　]/g, "").match(/(\d{3})-?(\d{4})/);
+  if (zipMatch) {
+    const zip = zipMatch[1] + zipMatch[2];
+    try {
+      const r = await fetchWithTimeout(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`, 5000);
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.results?.[0]) {
+          const base = d.results[0].address1 + d.results[0].address2 + d.results[0].address3;
+          // 住所変換成功 → 番地部分を郵便番号より後ろから取り出して結合
+          const after = q.replace(/[〒\s　]/g,"").replace(/\d{3}-?\d{4}/, "").trim();
+          q = base + after;
+        }
+      }
+    } catch {}
+  }
+
+  // ② Nominatim メイン（日本住所・施設名）
   try {
     const r = await fetchWithTimeout(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=3&accept-language=ja`,
-      6000
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5&accept-language=ja`,
+      7000
     );
     if (r.ok) {
       const d = await r.json();
@@ -153,11 +170,27 @@ async function geocode(q) {
     }
   } catch {}
 
-  // フォールバック: クエリに「日本」を付けて再検索
+  // ③ photon.komoot（施設名・店舗名に強い）、日本に絞って検索
+  try {
+    const r = await fetchWithTimeout(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&lang=ja&bbox=122,24,154,46`,
+      6000
+    );
+    if (r.ok) {
+      const d = await r.json();
+      const jp = d?.features?.find(f =>
+        f.properties?.country === "Japan" || f.properties?.country === "日本"
+      );
+      const f = jp || d?.features?.[0];
+      if (f) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+    }
+  } catch {}
+
+  // ④ Nominatim 再試行（「日本」付き）
   try {
     const r = await fetchWithTimeout(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + " 日本")}&limit=1&accept-language=ja`,
-      6000
+      7000
     );
     if (r.ok) {
       const d = await r.json();
@@ -209,16 +242,15 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove, searc
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center",paddingLeft:32}}>
             <input value={spot.address||""} placeholder="住所（任意・より正確に取得できます）" onChange={e=>onUpdate(spot.id,"address",e.target.value)} style={{...SI,flex:1}}/>
-            <button onClick={()=>onGeocode(spot.id, spot.address||spot.name)} disabled={searching||!spot.name}
-              style={{padding:"7px 10px",borderRadius:7,border:"none",background:spot.lat?GREEN:"#e0e0e0",color:spot.lat?"#fff":"#888",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-              {spot.lat?"取得済":"位置取得"}
+            <button onClick={()=>onGeocode(spot.id, spot.address||spot.name)} disabled={spot.searching||!spot.name}
+              style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(spot.searching||!spot.name)?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(spot.searching||!spot.name)?0.5:1}}>
+              {spot.searching?"検索中...":(spot.lat?"再取得":"位置取得")}
             </button>
           </div>
-          {spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:GREEN,paddingLeft:32}}>取得済</p>}
+          {spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:GREEN,paddingLeft:32}}>✓ 取得済</p>}
           {spot.geoError && !spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:"#E24B4A",paddingLeft:32}}>取得できませんでした。住所をより詳しく入力してください。</p>}
         </div>
       ))}
-      {searching && <p style={{fontSize:12,color:GREEN,margin:"4px 0"}}>検索中...</p>}
       <button onClick={onAdd} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",marginTop:2}}>+ 場所を追加</button>
     </div>
   );
@@ -254,9 +286,9 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onGeocode, onMove, se
                 <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%"}}/>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所（任意）" style={{...SI,flex:1}}/>
-                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={searching||(!row.place&&!row.content&&!row.address)}
-                    style={{padding:"7px 10px",borderRadius:7,border:"none",background:row.lat?GREEN:"#e0e0e0",color:row.lat?"#fff":"#888",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-                    {row.lat?"取得済":"地図取得"}
+                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={row.searching||(!row.place&&!row.content&&!row.address)}
+                    style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
+                    {row.searching?"検索中...":(row.lat?"再取得":"地図取得")}
                   </button>
                 </div>
                 {row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:GREEN}}>取得済</p>}
@@ -450,7 +482,23 @@ export default function App() {
     setSaving(false); setShowAddDate(false); setEditDateId(null);
   };
 
-  // ── Photo upload ──
+  const deleteDate = async (id) => {
+    if(!window.confirm("このデート記録を削除しますか？\nこの操作は元に戻せません。")) return;
+    try {
+      await deleteDoc(doc(db,"dates",id));
+      setDates(p=>p.filter(d=>d.id!==id));
+      setSelDateId(null);
+    } catch(e) { alert("削除に失敗しました: "+e.message); }
+  };
+
+  const deletePlan = async (id) => {
+    if(!window.confirm("この計画を削除しますか？\nこの操作は元に戻せません。")) return;
+    try {
+      await deleteDoc(doc(db,"plans",id));
+      setPlans(p=>p.filter(pl=>pl.id!==id));
+      setSelPlanId(null);
+    } catch(e) { alert("削除に失敗しました: "+e.message); }
+  };
   const handlePhoto = async (e) => {
     const files = Array.from(e.target.files);
     for (const f of files) {
@@ -463,11 +511,14 @@ export default function App() {
 
   const ndUpdRow  = (id,f,v) => setNdItems(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
   const ndUpdSpot = (id,field,val) => setNdSpots(p=>p.map(s=>s.id===id?{...s,[field]:val}:s));
-  const ndGeoSpot = async(id,query) => {
-    if(!query)return; setNdSearch(true);
-    const r=await geocode(query); setNdSearch(false);
-    if(r) setNdSpots(p=>p.map(s=>s.id===id?{...s,lat:r.lat,lng:r.lng,geoError:false}:s));
-    else setNdSpots(p=>p.map(s=>s.id===id?{...s,geoError:true}:s));
+  const ndGeoSpot = async(id,q) => {
+    if(!q)return;
+    setNdSpots(p=>p.map(s=>s.id===id?{...s,lat:"",lng:"",geoError:false,searching:true}:s));
+    try {
+      const r=await geocode(q);
+      if(r) setNdSpots(p=>p.map(s=>s.id===id?{...s,lat:r.lat,lng:r.lng,geoError:false,searching:false}:s));
+      else  setNdSpots(p=>p.map(s=>s.id===id?{...s,geoError:true,searching:false}:s));
+    } catch { setNdSpots(p=>p.map(s=>s.id===id?{...s,geoError:true,searching:false}:s)); }
   };
   const ndMoveSpot = (i, dir) => setNdSpots(p => {
     const a=[...p], j=i+dir;
@@ -486,10 +537,13 @@ export default function App() {
     return {...r,[field]:val};
   }));
   const npGeoSched = async(id,q) => {
-    if(!q)return; setNpSearch(true);
-    const r=await geocode(q); setNpSearch(false);
-    if(r) setNpSched(p=>p.map(s=>s.id===id?{...s,lat:r.lat,lng:r.lng,geoError:false}:s));
-    else setNpSched(p=>p.map(s=>s.id===id?{...s,geoError:true}:s));
+    if(!q)return;
+    setNpSched(p=>p.map(s=>s.id===id?{...s,lat:"",lng:"",geoError:false,searching:true}:s));
+    try {
+      const r=await geocode(q);
+      if(r) setNpSched(p=>p.map(s=>s.id===id?{...s,lat:r.lat,lng:r.lng,geoError:false,searching:false}:s));
+      else  setNpSched(p=>p.map(s=>s.id===id?{...s,geoError:true,searching:false}:s));
+    } catch { setNpSched(p=>p.map(s=>s.id===id?{...s,geoError:true,searching:false}:s)); }
   };
   const npMoveSched = (i, dir) => setNpSched(p => {
     const a=[...p], j=i+dir;
@@ -515,6 +569,24 @@ export default function App() {
   const markDone = async (planId) => {
     await updateDoc(doc(db,"plans",planId), {status:"実行済み"});
     setPlans(p=>p.map(pl=>pl.id===planId?{...pl,status:"実行済み"}:pl));
+  };
+
+  const deleteDate = async (dateId) => {
+    if(!window.confirm("このデート記録を削除しますか？")) return;
+    try {
+      await deleteDoc(doc(db,"dates",dateId));
+      setDates(p=>p.filter(d=>d.id!==dateId));
+      setSelDateId(null);
+    } catch(e) { alert("削除に失敗しました: "+e.message); }
+  };
+
+  const deletePlan = async (planId) => {
+    if(!window.confirm("この計画を削除しますか？")) return;
+    try {
+      await deleteDoc(doc(db,"plans",planId));
+      setPlans(p=>p.filter(pl=>pl.id!==planId));
+      setSelPlanId(null);
+    } catch(e) { alert("削除に失敗しました: "+e.message); }
   };
 
   const bkUpd = (id,f,v) => setBulkRows(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
@@ -664,7 +736,11 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <button onClick={()=>openEditDate(selDate)} style={{width:"100%",marginTop:"0.5rem",padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",color:"#555",fontWeight:700,fontSize:14,cursor:"pointer"}}>編集する</button>
+            <div style={{display:"flex",gap:10,marginTop:"0.5rem"}}>
+              <button onClick={()=>openEditDate(selDate)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",color:"#555",fontWeight:700,fontSize:14,cursor:"pointer"}}>編集する</button>
+              <button onClick={()=>deleteDate(selDate.id)} style={{padding:"12px 16px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff8f8",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除</button>
+            </div>
+            <button onClick={()=>deleteDate(selDate.id)} style={{width:"100%",marginTop:"0.5rem",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除する</button>
           </div>
         )}
 
@@ -783,10 +859,12 @@ export default function App() {
                 <span>予算合計</span><span style={{color:GREEN}}>{fmt(budgetOf(selPlan.schedule||[]))}</span>
               </div>
             </div>
-            <div style={{display:"flex",gap:10,marginTop:"1rem"}}>
+            <div style={{display:"flex",gap:10,marginTop:"1rem",flexWrap:"wrap"}}>
               <button onClick={()=>openEditPlan(selPlan)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",color:"#555",fontWeight:700,fontSize:14,cursor:"pointer"}}>編集する</button>
               {selPlan.status==="計画中"&&<button onClick={()=>markDone(selPlan.id)} style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${GREEN}`,background:"#fff",color:GREEN,fontWeight:700,fontSize:14,cursor:"pointer"}}>実行済みにする</button>}
+              <button onClick={()=>deletePlan(selPlan.id)} style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff8f8",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除</button>
             </div>
+            <button onClick={()=>deletePlan(selPlan.id)} style={{width:"100%",marginTop:"0.5rem",padding:"12px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff",color:"#E24B4A",fontWeight:700,fontSize:14,cursor:"pointer"}}>削除する</button>
           </div>
         )}
 
