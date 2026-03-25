@@ -29,7 +29,7 @@ const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観
 
 const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "折半" });
 const makeSpot  = (id) => ({ id, name: "", address: "", lat: "", lng: "" });
-const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "", place: "", address: "", lat: "", lng: "", natsuki: { time: "", from: "", budget: "" }, akira: { time: "", from: "", budget: "" } });
+const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "", place: "", address: "", lat: "", lng: "", dayOffset: 0, natsuki: { time: "", from: "", budget: "" }, akira: { time: "", from: "", budget: "" } });
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransport(r.cat) ? s + (Number(r.natsuki?.budget)||0) + (Number(r.akira?.budget)||0) : s + (Number(r.budget)||0), 0);
@@ -56,7 +56,7 @@ function LoginScreen({ onLogin, error, loading }) {
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#f7faf9",padding:"1.5rem"}}>
       <div style={{width:"100%",maxWidth:360,background:"#fff",borderRadius:20,padding:"2rem 1.75rem",boxShadow:"0 4px 24px rgba(0,0,0,0.08)"}}>
         <p style={{margin:"0 0 4px",fontWeight:700,fontSize:22,color:GREEN,textAlign:"center"}}>AkNk プラン</p>
-        <p style={{margin:"0 0 2rem",fontSize:13,color:"#aaa",textAlign:"center"}}>2人のデート記録・計画アプリ</p>
+        <p style={{margin:"0 0 2rem",fontSize:13,color:"#aaa",textAlign:"center"}}>2人の記録・計画アプリ</p>
         <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4}}>メールアドレス</label>
         <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="例: natsuki@aknk.app"
           style={{...INP,marginBottom:12}} onKeyDown={e=>e.key==="Enter"&&onLogin(email,password)}/>
@@ -268,11 +268,21 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
   );
 }
 
-function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) {
+function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, baseDate }) {
+  // 基準日から日付ラベルを生成（最大7日）
+  const dayOptions = Array.from({length:7}, (_,i) => {
+    if (!baseDate) return { value: i, label: `${i+1}日目` };
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + i);
+    const m = d.getMonth()+1, day = d.getDate();
+    return { value: i, label: `${i+1}日目（${m}/${day}）` };
+  });
+
   return (
     <div style={{width:"100%",minWidth:0}}>
       {rows.map((row,i) => {
         const trans = isTransport(row.cat), ret = isReturn(row.cat);
+        const dayOff = row.dayOffset ?? 0;
         return (
           <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee",minWidth:0,boxSizing:"border-box"}}>
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,minWidth:0}}>
@@ -286,13 +296,20 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) 
               <input value={row.content} onChange={e=>onUpdate(row.id,"content",e.target.value)} placeholder="内容" style={{...SI,flex:1,minWidth:0}}/>
               <button onClick={()=>onRemove(row.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:16,cursor:"pointer",padding:0,flexShrink:0}}>×</button>
             </div>
+            {/* 日付セレクト */}
+            <div style={{paddingLeft:32,marginBottom:6}}>
+              <select value={dayOff} onChange={e=>onUpdate(row.id,"dayOffset",Number(e.target.value))}
+                style={{...SI,fontSize:12,padding:"5px 8px",background:"#fff",color:GREEN,fontWeight:600,border:`1px solid ${GREEN}44`}}>
+                {dayOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
             {!trans && (
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input type="time" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:90,flexShrink:0}}/>
+                  <input type="time" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box"}}/>
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right"}}/>
+                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
                   </div>
                 </div>
                 <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%",boxSizing:"border-box"}}/>
@@ -308,15 +325,15 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) 
               </div>
             )}
             {trans && (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,minWidth:0,overflow:"hidden"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,minWidth:0,width:"100%",boxSizing:"border-box"}}>
                 {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label]) => (
                   <div key={who} style={{background:"#fff",borderRadius:8,padding:"8px 8px",border:`1px solid ${USER_COLORS[label]}33`,minWidth:0,overflow:"hidden",boxSizing:"border-box"}}>
                     <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                    <input type="time" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12}}/>
+                    <input type="time" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12,minWidth:0}}/>
                     <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
-                      placeholder={ret?"目的地":"出発地"} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12}}/>
+                      placeholder={ret?"目的地":"出発地"} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12,minWidth:0}}/>
                     <div style={{display:"flex",alignItems:"center",gap:3,minWidth:0}}>
-                      <span style={{fontSize:10,color:"#aaa",flexShrink:0}}>予算¥</span>
+                      <span style={{fontSize:10,color:"#aaa",flexShrink:0}}>¥</span>
                       <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right",minWidth:0,boxSizing:"border-box",fontSize:12}}/>
                     </div>
                   </div>
@@ -548,6 +565,7 @@ export default function App() {
     if(field==="akira_time")     return {...r,akira:{...r.akira,time:val}};
     if(field==="akira_from")     return {...r,akira:{...r.akira,from:val}};
     if(field==="akira_budget")   return {...r,akira:{...r.akira,budget:val}};
+    if(field==="dayOffset")      return {...r,dayOffset:val};
     return {...r,[field]:val};
   }));
   const npGeoSched = async(id,q) => {
@@ -609,7 +627,7 @@ export default function App() {
 
       <div style={{background:"#fff",borderBottom:"1px solid #eee",padding:"14px 16px 0"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <p style={{margin:0,fontWeight:700,fontSize:16,color:GREEN}}>AkNk プラン</p>
+          <p onClick={()=>{setActiveTab("ホーム");setSelDateId(null);setSelPlanId(null);}} style={{margin:0,fontWeight:700,fontSize:16,color:GREEN,cursor:"pointer"}}>AkNk プラン</p>
           <button onClick={handleLogout} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #eee",background:"transparent",color:"#aaa",cursor:"pointer"}}>ログアウト</button>
         </div>
         <div style={{display:"flex"}}>
@@ -809,47 +827,68 @@ export default function App() {
             )}
             <p style={{fontWeight:700,fontSize:14,marginBottom:8}}>タイムスケジュール</p>
             <div style={CS}>
-              {(selPlan.schedule||[]).map((s,i)=>{
-                const trans=isTransport(s.cat), ret=isReturn(s.cat);
-                return (
-                  <div key={s.id||i} style={{padding:"8px 0",borderBottom:i<selPlan.schedule.length-1?"1px solid #f0f0f0":"none"}}>
-                    {!trans&&(
-                      <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                        <span style={{fontSize:13,color:"#888",fontWeight:500,minWidth:44,flexShrink:0}}>{s.time||"--:--"}</span>
-                        <div style={{flex:1}}>
-                          <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{fontSize:14,fontWeight:500}}>{s.content}</span>
-                            {s.budget&&<span style={{fontSize:13,color:GREEN,fontWeight:700}}>{fmt(s.budget)}</span>}
-                          </div>
-                          <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
-                            <span style={{fontSize:11,color:"#888"}}>{s.cat}</span>
-                            {(s.place||s.lat)&&(
-                              <a href={s.lat?`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.place)}`} target="_blank" rel="noreferrer"
-                                style={{fontSize:11,color:GREEN,textDecoration:"none"}}>{s.place||"地図"} →Gマップ</a>
+              {(()=>{
+                const schedule = selPlan.schedule||[];
+                // dayOffsetでグループ化
+                const days = [...new Set(schedule.map(s=>s.dayOffset??0))].sort((a,b)=>a-b);
+                return days.map(dayOff => {
+                  const dayRows = schedule.filter(s=>(s.dayOffset??0)===dayOff);
+                  // 日付ラベル生成
+                  let dayLabel = `${dayOff+1}日目`;
+                  if (selPlan.date) {
+                    const d = new Date(selPlan.date);
+                    d.setDate(d.getDate()+dayOff);
+                    dayLabel = `${dayOff+1}日目（${d.getMonth()+1}/${d.getDate()}）`;
+                  }
+                  return (
+                    <div key={dayOff} style={{marginBottom:dayOff<days[days.length-1]?12:0}}>
+                      {days.length>1&&<p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:GREEN,background:"#e8f5f0",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{dayLabel}</p>}
+                      {dayRows.map((s,i)=>{
+                        const trans=isTransport(s.cat), ret=isReturn(s.cat);
+                        const isLast = i===dayRows.length-1 && dayOff===days[days.length-1];
+                        return (
+                          <div key={s.id||i} style={{padding:"8px 0",borderBottom:!isLast?"1px solid #f0f0f0":"none"}}>
+                            {!trans&&(
+                              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                                <span style={{fontSize:13,color:"#888",fontWeight:500,minWidth:44,flexShrink:0}}>{s.time||"--:--"}</span>
+                                <div style={{flex:1}}>
+                                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                                    <span style={{fontSize:14,fontWeight:500}}>{s.content}</span>
+                                    {s.budget&&<span style={{fontSize:13,color:GREEN,fontWeight:700}}>{fmt(s.budget)}</span>}
+                                  </div>
+                                  <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
+                                    <span style={{fontSize:11,color:"#888"}}>{s.cat}</span>
+                                    {(s.place||s.lat)&&(
+                                      <a href={s.lat?`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.place)}`} target="_blank" rel="noreferrer"
+                                        style={{fontSize:11,color:GREEN,textDecoration:"none"}}>{s.place||"地図"} →Gマップ</a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {trans&&(
+                              <div>
+                                <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}　{s.content}</p>
+                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                                  {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label])=>{
+                                    const d=s[who]||{}, hasData=d.time||d.from||d.budget;
+                                    return (
+                                      <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
+                                        <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
+                                        {hasData?(<>{d.time&&<p style={{margin:"0 0 2px",fontSize:13}}>{d.time}</p>}{d.from&&<p style={{margin:"0 0 2px",fontSize:12,color:"#555"}}>{ret?"目的地":"出発地"}: {d.from}</p>}{d.budget&&<p style={{margin:0,fontSize:12,color:GREEN,fontWeight:700}}>{fmt(d.budget)}</p>}</>):<p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             )}
                           </div>
-                        </div>
-                      </div>
-                    )}
-                    {trans&&(
-                      <div>
-                        <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}　{s.content}</p>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                          {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label])=>{
-                            const d=s[who]||{}, hasData=d.time||d.from||d.budget;
-                            return (
-                              <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
-                                <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                                {hasData?(<>{d.time&&<p style={{margin:"0 0 2px",fontSize:13}}>{d.time}</p>}{d.from&&<p style={{margin:"0 0 2px",fontSize:12,color:"#555"}}>{ret?"目的地":"出発地"}: {d.from}</p>}{d.budget&&<p style={{margin:0,fontSize:12,color:GREEN,fontWeight:700}}>{fmt(d.budget)}</p>}</>):<p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                        );
+                      })}
+                    </div>
+                  );
+                });
+              })()}
               <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee",display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15}}>
                 <span>予算合計</span><span style={{color:GREEN}}>{fmt(budgetOf(selPlan.schedule||[]))}</span>
               </div>
@@ -946,9 +985,9 @@ export default function App() {
           <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",overflow:"hidden",height:"88vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"1.25rem 1.25rem 1rem",borderBottom:"1px solid #eee",flexShrink:0}}>
               <p style={{margin:"0 0 0.75rem",fontWeight:700,fontSize:16}}>{editDateId?"デートを編集":"新しいデートを記録"}</p>
-              <div style={{display:"flex",gap:10}}>
-                <div style={{flex:2}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>タイトル *</label><input value={ndTitle} onChange={e=>setNdTitle(e.target.value)} placeholder="例: 梅田グルメデート" style={INP}/></div>
-                <div style={{flex:1}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>日付 *</label><input type="date" value={ndDate} onChange={e=>setNdDate(e.target.value)} style={INP}/></div>
+              <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <div style={{flex:2,minWidth:0}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>タイトル *</label><input value={ndTitle} onChange={e=>setNdTitle(e.target.value)} placeholder="例: 梅田グルメデート" style={{...INP,minWidth:0}}/></div>
+                <div style={{flexShrink:0,width:120}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>日付 *</label><input type="date" value={ndDate} onChange={e=>setNdDate(e.target.value)} style={{...INP,fontSize:13,padding:"9px 6px"}}/></div>
               </div>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
@@ -981,15 +1020,15 @@ export default function App() {
           <div style={{background:"#fff",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:600,margin:"0 auto",boxSizing:"border-box",overflow:"hidden",height:"88vh",display:"flex",flexDirection:"column"}}>
             <div style={{padding:"1.25rem 1.25rem 1rem",borderBottom:"1px solid #eee",flexShrink:0}}>
               <p style={{margin:"0 0 0.75rem",fontWeight:700,fontSize:16}}>{editPlanId?"計画を編集":"デート計画を追加"}</p>
-              <div style={{display:"flex",gap:10}}>
-                <div style={{flex:2}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>タイトル *</label><input value={npTitle} onChange={e=>setNpTitle(e.target.value)} placeholder="例: 金沢・兼六園デート" style={INP}/></div>
-                <div style={{flex:1}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>予定日 *</label><input type="date" value={npDate} onChange={e=>setNpDate(e.target.value)} style={INP}/></div>
+              <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <div style={{flex:2,minWidth:0}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>タイトル *</label><input value={npTitle} onChange={e=>setNpTitle(e.target.value)} placeholder="例: 金沢・兼六園デート" style={{...INP,minWidth:0}}/></div>
+                <div style={{flexShrink:0,width:120}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>予定日 *</label><input type="date" value={npDate} onChange={e=>setNpDate(e.target.value)} style={{...INP,fontSize:13,padding:"9px 6px"}}/></div>
               </div>
             </div>
             <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ・アイデア</label><textarea value={npMemo} onChange={e=>setNpMemo(e.target.value)} placeholder="行きたいお店やアイデアなど..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
-              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched}/>
+              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched} baseDate={npDate}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>予算合計: {fmt(budgetOf(npSched))}</div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
