@@ -306,7 +306,16 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
             {!trans && (
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input type="time" step="900" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box",fontSize:13}}/>
+                  <select value={row.time||""} onChange={e=>onUpdate(row.id,"time",e.target.value)}
+                    style={{...SI,width:100,flexShrink:0,boxSizing:"border-box",fontSize:13}}>
+                    <option value="">--:--</option>
+                    {Array.from({length:96},(_,i)=>{
+                      const h=String(Math.floor(i/4)).padStart(2,"0");
+                      const m=String((i%4)*15).padStart(2,"0");
+                      const v=`${h}:${m}`;
+                      return <option key={v} value={v}>{v}</option>;
+                    })}
+                  </select>
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
                     <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
