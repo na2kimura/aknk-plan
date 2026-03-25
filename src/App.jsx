@@ -24,6 +24,7 @@ import {
 const GREEN = "#1D9E75";
 const USERS = ["Nk", "Ak"];
 const EXPENSE_CATS = ["飛行機", "電車", "その他交通費", "食事", "宿泊", "体験", "その他"];
+const TRANSPORT_CATS = ["飛行機", "電車", "その他交通費"]; // 交通費グループ
 const USER_COLORS = { Nk: "#D4537E", Ak: "#378ADD", Natsuki: "#D4537E", Akira: "#378ADD" };
 // メールアドレス→ユーザー名マッピング
 const EMAIL_TO_USER = {
@@ -499,10 +500,13 @@ export default function App() {
     return res;
   },[dates]);
 
+  const isTransportCat = (cat) => TRANSPORT_CATS.includes(cat);
+
   const catSummary = useMemo(()=>{
     const map={};
     filtered.forEach(d=>(d.items||[]).forEach(i=>{
-      if(filterCat!=="すべて"&&i.cat!==filterCat)return;
+      if(filterCat==="交通費") { if(!isTransportCat(i.cat)) return; }
+      else if(filterCat!=="すべて" && i.cat!==filterCat) return;
       map[i.cat]=(map[i.cat]||0)+(Number(i.amount)||0);
     }));
     return Object.entries(map).sort((a,b)=>b[1]-a[1]);
@@ -510,6 +514,7 @@ export default function App() {
 
   const catFilteredTotal = useMemo(()=>{
     if(filterCat==="すべて") return filteredTot;
+    if(filterCat==="交通費") return filtered.reduce((s,d)=>s+(d.items||[]).filter(i=>isTransportCat(i.cat)).reduce((ss,i)=>ss+(Number(i.amount)||0),0),0);
     return filtered.reduce((s,d)=>s+(d.items||[]).filter(i=>i.cat===filterCat).reduce((ss,i)=>ss+(Number(i.amount)||0),0),0);
   },[filtered,filterCat,filteredTot]);
 
@@ -990,15 +995,27 @@ export default function App() {
               {(filterYear!=="すべて"||filterMonth!=="すべて")&&<button onClick={()=>{setFilterYear("すべて");setFilterMonth("すべて");}} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>リセット</button>}
             </div>
             <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-              {["すべて",...EXPENSE_CATS].map(c=>(
+              {["すべて","交通費",...EXPENSE_CATS].map(c=>(
                 <button key={c} onClick={()=>setFilterCat(c)} style={{fontSize:12,padding:"4px 10px",borderRadius:20,border:`1px solid ${filterCat===c?GREEN:"#ddd"}`,background:filterCat===c?GREEN:"transparent",color:filterCat===c?"#fff":"#555",cursor:"pointer",whiteSpace:"nowrap"}}>{c}</button>
               ))}
             </div>
             {catSummary.length>0&&(
               <div style={{...CS,marginBottom:10}}>
+                {/* 交通費合計行（すべて表示時 or 交通費フィルター時） */}
+                {(filterCat==="すべて"||filterCat==="交通費")&&(()=>{
+                  const transportTotal = catSummary.filter(([cat])=>isTransportCat(cat)).reduce((s,[,t])=>s+t,0);
+                  if(!transportTotal) return null;
+                  return (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f0f0",fontSize:13,background:"#f0f9f5",margin:"0 -4px",padding:"6px 4px",borderRadius:4}}>
+                      <span style={{color:GREEN,fontWeight:600}}>🚃 交通費合計</span>
+                      <span style={{fontWeight:700,color:GREEN}}>{fmt(transportTotal)}</span>
+                    </div>
+                  );
+                })()}
                 {catSummary.map(([cat,t],i)=>(
                   <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<catSummary.length-1?"1px solid #f0f0f0":"none",fontSize:13}}>
-                    <span style={{color:"#555"}}>{cat}</span><span style={{fontWeight:700}}>{fmt(t)}</span>
+                    <span style={{color:isTransportCat(cat)?"#666":"#555",paddingLeft:isTransportCat(cat)?8:0}}>{cat}</span>
+                    <span style={{fontWeight:700}}>{fmt(t)}</span>
                   </div>
                 ))}
                 <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0 0",marginTop:4,borderTop:"2px solid #eee",fontWeight:700,fontSize:14}}>
@@ -1008,7 +1025,9 @@ export default function App() {
             )}
             <div style={CS}>
               {filtered.map((d,i)=>{
-                const dispItems=filterCat==="すべて"?(d.items||[]):(d.items||[]).filter(it=>it.cat===filterCat);
+                const dispItems = filterCat==="すべて" ? (d.items||[])
+                  : filterCat==="交通費" ? (d.items||[]).filter(it=>isTransportCat(it.cat))
+                  : (d.items||[]).filter(it=>it.cat===filterCat);
                 const dispTotal=totalOf(dispItems);
                 if(filterCat!=="すべて"&&dispTotal===0)return null;
                 return (
