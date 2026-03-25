@@ -22,9 +22,9 @@ import {
 } from "firebase/storage";
 
 const GREEN = "#1D9E75";
-const USERS = ["Nk", "Ak", "折半"];
+const USERS = ["Nk", "Ak"];
 const EXPENSE_CATS = ["飛行機", "電車", "その他交通費", "食事", "宿泊", "体験", "その他"];
-const USER_COLORS = { Nk: "#D4537E", Ak: "#378ADD", 折半: "#888", Natsuki: "#D4537E", Akira: "#378ADD" };
+const USER_COLORS = { Nk: "#D4537E", Ak: "#378ADD", Natsuki: "#D4537E", Akira: "#378ADD" };
 // メールアドレス→ユーザー名マッピング
 const EMAIL_TO_USER = {
   "na2kimu@gmail.com": "Nk",
@@ -36,7 +36,7 @@ const getPartnerName = (myName) => myName === "Nk" ? "Ak" : "Nk";
 const toDisplayUser = (u) => u === "Natsuki" ? "Nk" : u === "Akira" ? "Ak" : u;
 const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観光", "食事", "宿泊", "体験", "休憩", "その他"];
 
-const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "折半" });
+const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "Nk" });
 const makeSpot  = (id) => ({ id, name: "", address: "", lat: "", lng: "" });
 const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "", place: "", address: "", lat: "", lng: "", dayOffset: 0, natsuki: { time: "", from: "", budget: "" }, akira: { time: "", from: "", budget: "" } });
 
@@ -485,7 +485,7 @@ export default function App() {
   },[dates]);
 
   const userTotals = useMemo(()=>{
-    const res={Nk:0,Ak:0,折半:0};
+    const res={Nk:0,Ak:0};
     dates.forEach(d=>(d.items||[]).forEach(i=>{
       const key = toDisplayUser(i.paidBy);
       res[key]=(res[key]||0)+(Number(i.amount)||0);
@@ -521,8 +521,8 @@ export default function App() {
   const openEditDate = (d) => {
     setEditDateId(d.id); setNdTitle(d.title); setNdDate(d.date); setNdMemo(d.memo||"");
     const allItems = (d.items||[]).map(it=>({...it, amount: String(it.amount), paidBy: toDisplayUser(it.paidBy)}));
-    // 自分+折半の行は編集可、相手の行は表示のみ
-    const myItems = allItems.filter(it => it.paidBy === currentUserName || it.paidBy === "折半");
+    // 自分の行は編集可、相手の行は表示のみ
+    const myItems = allItems.filter(it => it.paidBy === currentUserName);
     const otherItems = allItems.filter(it => it.paidBy === partnerName);
     setNdItems(myItems.length ? myItems : Array.from({length:3},(_,i)=>makeRow(i+1)));
     setPartnerItems(otherItems);
@@ -785,7 +785,7 @@ export default function App() {
               <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee"}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16,marginBottom:6}}><span>合計</span><span style={{color:GREEN}}>{fmt(totalOf(selDate.items||[]))}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                  {[["Nk","Natsuki"],["Ak","Akira"],["折半",null]].map(([u,alt])=>{const t=paidByUser(selDate.items||[],u,alt);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                  {[["Nk","Natsuki"],["Ak","Akira"]].map(([u,alt])=>{const t=paidByUser(selDate.items||[],u,alt);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                 </div>
               </div>
             </div>
@@ -1007,7 +1007,7 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{fontWeight:500}}>{d.title}</span><span style={{fontWeight:700}}>{fmt(dispTotal)}</span></div>
                     <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
                       <span style={{fontSize:11,color:"#aaa"}}>{d.date}</span>
-                      {filterCat==="すべて"&&[["Nk","Natsuki"],["Ak","Akira"],["折半",null]].map(([u,alt])=>{const t=paidByUser(d.items||[],u,alt);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                      {filterCat==="すべて"&&[["Nk","Natsuki"],["Ak","Akira"]].map(([u,alt])=>{const t=paidByUser(d.items||[],u,alt);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                     </div>
                   </div>
                 );
@@ -1054,8 +1054,8 @@ export default function App() {
                   ))}
                 </div>
               )}
-              {/* 自分+折半のアイテム（編集可） */}
-              <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>{currentUserName}・折半の入力分</p>
+              {/* 自分のアイテム（編集可） */}
+              <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>{currentUserName}の入力分</p>
               <RowEditor rows={ndItems} onUpdate={ndUpdRow} onAdd={()=>setNdItems(p=>[...p,makeRow(Date.now())])} onRemove={id=>setNdItems(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>合計: {fmt(totalOf([...ndItems,...partnerItems]))}</div>
             </div>
