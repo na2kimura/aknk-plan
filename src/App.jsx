@@ -25,6 +25,13 @@ const GREEN = "#1D9E75";
 const USERS = ["Nk", "Ak", "折半"];
 const EXPENSE_CATS = ["飛行機", "電車", "その他交通費", "食事", "宿泊", "体験", "その他"];
 const USER_COLORS = { Nk: "#D4537E", Ak: "#378ADD", 折半: "#888", Natsuki: "#D4537E", Akira: "#378ADD" };
+// メールアドレス→ユーザー名マッピング
+const EMAIL_TO_USER = {
+  "na2kimu@gmail.com": "Nk",
+  "marcosmini1@gmail.com": "Ak",
+};
+const getUserName = (email) => EMAIL_TO_USER[email] || "Nk";
+const getPartnerName = (myName) => myName === "Nk" ? "Ak" : "Nk";
 // 旧データ(Natsuki/Akira)→新表示名(Nk/Ak)変換
 const toDisplayUser = (u) => u === "Natsuki" ? "Nk" : u === "Akira" ? "Ak" : u;
 const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観光", "食事", "宿泊", "体験", "休憩", "その他"];
@@ -388,6 +395,11 @@ export default function App() {
   const [photoView,   setPhotoView]   = useState(null);
   const [saving,      setSaving]      = useState(false);
 
+  // ログインユーザー名とパートナーアイテム（編集不可）
+  const currentUserName = user ? getUserName(user.email) : "Nk";
+  const partnerName = getPartnerName(currentUserName);
+  const [partnerItems, setPartnerItems] = useState([]);
+
   const [ndTitle,  setNdTitle]  = useState("");
   const [ndDate,   setNdDate]   = useState("");
   const [ndMemo,   setNdMemo]   = useState("");
@@ -503,12 +515,17 @@ export default function App() {
   const openAddDate = () => {
     setEditDateId(null); setNdTitle(""); setNdDate(""); setNdMemo("");
     setNdItems(Array.from({length:5},(_,i)=>makeRow(i+1)));
+    setPartnerItems([]);
     setNdSpots([makeSpot(1)]); setNdPhotos([]); setShowAddDate(true);
   };
   const openEditDate = (d) => {
     setEditDateId(d.id); setNdTitle(d.title); setNdDate(d.date); setNdMemo(d.memo||"");
-    const existing = (d.items||[]).map(it=>({...it, amount: String(it.amount)}));
-    setNdItems(existing.length ? existing : Array.from({length:5},(_,i)=>makeRow(i+1)));
+    const allItems = (d.items||[]).map(it=>({...it, amount: String(it.amount), paidBy: toDisplayUser(it.paidBy)}));
+    // 自分+折半の行は編集可、相手の行は表示のみ
+    const myItems = allItems.filter(it => it.paidBy === currentUserName || it.paidBy === "折半");
+    const otherItems = allItems.filter(it => it.paidBy === partnerName);
+    setNdItems(myItems.length ? myItems : Array.from({length:3},(_,i)=>makeRow(i+1)));
+    setPartnerItems(otherItems);
     setNdSpots((d.spots||[]).length ? d.spots.map(s=>({...s})) : [makeSpot(1)]);
     setNdPhotos(d.photos ? [...d.photos] : []);
     setShowAddDate(true);
@@ -517,7 +534,10 @@ export default function App() {
   const saveDate = async () => {
     if(!ndTitle||!ndDate) return;
     setSaving(true);
-    const validItems = ndItems.filter(i => i.amount !== "" && Number(i.amount) > 0).map(i=>({...i,amount:Number(i.amount)}));
+    const myValidItems = ndItems.filter(i => i.amount !== "" && Number(i.amount) > 0).map(i=>({...i,amount:Number(i.amount)}));
+    // パートナーのアイテムも保持（amount数値に戻す）
+    const partnerValidItems = partnerItems.map(i=>({...i,amount:Number(i.amount)}));
+    const validItems = [...myValidItems, ...partnerValidItems];
     const validSpots = ndSpots.filter(s => s.name);
     const data = { title:ndTitle, date:ndDate, memo:ndMemo, items:validItems, spots:validSpots, photos:ndPhotos };
     try {
@@ -1022,8 +1042,22 @@ export default function App() {
                 {ndPhotos.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{ndPhotos.map(p=><div key={p.id} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",border:"1px solid #eee"}}><img src={p.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div>}
               </div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:8}}>費用明細</p>
+              {/* パートナーのアイテム（表示のみ） */}
+              {partnerItems.length > 0 && (
+                <div style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px",marginBottom:10,border:"1px solid #eee"}}>
+                  <p style={{margin:"0 0 6px",fontSize:11,color:"#aaa"}}>{partnerName}の入力分（編集不可）</p>
+                  {partnerItems.map((item,i) => (
+                    <div key={item.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:i<partnerItems.length-1?"1px solid #eee":"none",fontSize:13}}>
+                      <span style={{color:"#555"}}>{itemLabel(item)}</span>
+                      <span style={{fontWeight:600,color:USER_COLORS[item.paidBy]||"#888"}}>{fmt(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 自分+折半のアイテム（編集可） */}
+              <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>{currentUserName}・折半の入力分</p>
               <RowEditor rows={ndItems} onUpdate={ndUpdRow} onAdd={()=>setNdItems(p=>[...p,makeRow(Date.now())])} onRemove={id=>setNdItems(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
-              <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>合計: {fmt(totalOf(ndItems))}</div>
+              <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>合計: {fmt(totalOf([...ndItems,...partnerItems]))}</div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>{setShowAddDate(false);setEditDateId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
