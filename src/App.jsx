@@ -306,7 +306,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
             {!trans && (
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input type="time" step="900" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box"}}/>
+                  <input type="time" step="900" value={row.time} onChange={e=>onUpdate(row.id,"time",e.target.value)} style={{...SI,width:100,flexShrink:0,boxSizing:"border-box",fontSize:13}}/>
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
                     <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
@@ -325,17 +325,19 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
               </div>
             )}
             {trans && (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,minWidth:0,width:"100%",boxSizing:"border-box"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%",boxSizing:"border-box"}}>
                 {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label]) => (
-                  <div key={who} style={{background:"#fff",borderRadius:8,padding:"8px 8px",border:`1px solid ${USER_COLORS[label]}33`,minWidth:0,overflow:"hidden",boxSizing:"border-box"}}>
-                    <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                    <input type="time" step="60" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:11,padding:"6px 4px",minWidth:0}}/>
-                    <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
-                      placeholder={ret?"目的地":"出発地"} style={{...SI,width:"100%",marginBottom:5,boxSizing:"border-box",fontSize:12,minWidth:0}}/>
-                    <div style={{display:"flex",alignItems:"center",gap:3,minWidth:0}}>
-                      <span style={{fontSize:10,color:"#aaa",flexShrink:0}}>¥</span>
-                      <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right",minWidth:0,boxSizing:"border-box",fontSize:12}}/>
+                  <div key={who} style={{background:"#fff",borderRadius:8,padding:"10px 12px",border:`1px solid ${USER_COLORS[label]}33`,boxSizing:"border-box"}}>
+                    <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
+                    <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                      <input type="time" step="60" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:110,flexShrink:0,boxSizing:"border-box"}}/>
+                      <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
+                        <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
+                        <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right",minWidth:0,boxSizing:"border-box"}}/>
+                      </div>
                     </div>
+                    <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
+                      placeholder={ret?"目的地（例: 福井駅）":"出発地（例: 福井駅）"} style={{...SI,width:"100%",boxSizing:"border-box"}}/>
                   </div>
                 ))}
               </div>
