@@ -75,11 +75,42 @@ function LoginScreen({ onLogin, error, loading }) {
 
 // ── Map ──
 function SpotMap({ spots }) {
+  const ref = useRef(null), inst = useRef(null);
   const allNamed = spots.filter(s => s.name);
+  const withCoords = spots.filter(s => s.lat && s.lng && s.name);
+
+  useEffect(() => {
+    if (!ref.current || !withCoords.length) return;
+    const init = () => {
+      try {
+        if (inst.current) { inst.current.remove(); inst.current = null; }
+        if (!ref.current) return;
+        ref.current._leaflet_id = null;
+        const L = window.L;
+        const cx = withCoords.length === 1
+          ? [withCoords[0].lat, withCoords[0].lng]
+          : [withCoords.reduce((s,sp)=>s+Number(sp.lat),0)/withCoords.length, withCoords.reduce((s,sp)=>s+Number(sp.lng),0)/withCoords.length];
+        const map = L.map(ref.current).setView(cx, withCoords.length===1?15:13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
+        withCoords.forEach((sp) => {
+          const idx = allNamed.findIndex(s => s.id === sp.id || s.name === sp.name);
+          const num = idx >= 0 ? idx + 1 : "•";
+          const icon = L.divIcon({ html:`<div style="background:${GREEN};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)">${num}</div>`, className:"", iconSize:[28,28], iconAnchor:[14,14] });
+          const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.address||sp.name)}`;
+          L.marker([Number(sp.lat),Number(sp.lng)],{icon}).addTo(map)
+           .bindPopup(`<b>${sp.name}</b><br><a href="${gmapUrl}" target="_blank" style="color:${GREEN};font-size:12px">Googleマップで開く</a>`);
+        });
+        if (withCoords.length > 1) map.fitBounds(L.latLngBounds(withCoords.map(sp=>[Number(sp.lat),Number(sp.lng)])),{padding:[30,30]});
+        inst.current = map;
+      } catch(e) { console.error("Map init error:", e); }
+    };
+    if (!document.getElementById("lf-css")) { const lk=document.createElement("link");lk.id="lf-css";lk.rel="stylesheet";lk.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(lk); }
+    window.L ? init() : (() => { if (!document.getElementById("lf-js")) { const sc=document.createElement("script");sc.id="lf-js";sc.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";sc.onload=()=>setTimeout(init,50);document.head.appendChild(sc); } else setTimeout(init,200); })();
+    return () => { try { if (inst.current) { inst.current.remove(); inst.current=null; } } catch(e){} };
+  }, [JSON.stringify(withCoords)]);
+
   if (!allNamed.length) return null;
 
-  // 複数地点のGoogleマップルートURL生成
-  // 住所があれば住所、なければ場所名を使う
   const toQuery = (sp) => encodeURIComponent(sp.address || sp.name);
   const routeUrl = allNamed.length === 1
     ? `https://www.google.com/maps/search/?api=1&query=${toQuery(allNamed[0])}`
@@ -87,26 +118,26 @@ function SpotMap({ spots }) {
 
   return (
     <div>
-      {/* 全スポットまとめてGoogleマップで開くボタン */}
+      {/* アプリ内地図（座標取得済みのスポットのみ表示） */}
+      {withCoords.length > 0 && (
+        <div ref={ref} style={{width:"100%",height:220,borderRadius:10,overflow:"hidden",border:"1px solid #eee",marginBottom:8}}/>
+      )}
+      {/* Googleマップでルートを開くボタン */}
       <a href={routeUrl} target="_blank" rel="noreferrer"
-        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",padding:"10px",borderRadius:10,background:"#e8f5f0",border:`1px solid ${GREEN}33`,color:GREEN,fontWeight:700,fontSize:13,textDecoration:"none",marginBottom:8,boxSizing:"border-box"}}>
+        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",padding:"9px",borderRadius:10,background:"#e8f5f0",border:`1px solid ${GREEN}33`,color:GREEN,fontWeight:700,fontSize:13,textDecoration:"none",marginBottom:8,boxSizing:"border-box"}}>
         <span>🗺️</span>
         <span>{allNamed.length === 1 ? "Googleマップで開く" : `${allNamed.length}ヶ所のルートをGoogleマップで開く`}</span>
-        <span style={{fontSize:11}}>→</span>
       </a>
       {/* 個別リスト */}
       <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {allNamed.map((sp,i) => {
-          const url = `https://www.google.com/maps/search/?api=1&query=${toQuery(sp)}`;
-          return (
-            <a key={i} href={url} target="_blank" rel="noreferrer"
-              style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",textDecoration:"none",padding:"5px 8px",borderRadius:7,background:"#f7f7f7"}}>
-              <span style={{background:GREEN,color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-              <span style={{flex:1}}>{sp.name}</span>
-              <span style={{fontSize:11,color:GREEN}}>Gマップ</span>
-            </a>
-          );
-        })}
+        {allNamed.map((sp,i) => (
+          <a key={i} href={`https://www.google.com/maps/search/?api=1&query=${toQuery(sp)}`} target="_blank" rel="noreferrer"
+            style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",textDecoration:"none",padding:"5px 8px",borderRadius:7,background:"#f7f7f7"}}>
+            <span style={{background:sp.lat?GREEN:"#bbb",color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
+            <span style={{flex:1}}>{sp.name}</span>
+            <span style={{fontSize:11,color:GREEN}}>Gマップ</span>
+          </a>
+        ))}
       </div>
     </div>
   );
@@ -119,9 +150,8 @@ async function geocode(q) {
   // ① 郵便番号が含まれる場合: zipcloud で住所に変換
   const zipMatch = q.replace(/[〒\s　]/g, "").match(/(\d{3})-?(\d{4})/);
   if (zipMatch) {
-    const zip = zipMatch[1] + zipMatch[2];
     try {
-      const r = await fetchWithTimeout(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`, 5000);
+      const r = await fetchWithTimeout(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipMatch[1]+zipMatch[2]}`, 5000);
       if (r.ok) {
         const d = await r.json();
         if (d?.results?.[0]) {
@@ -133,10 +163,22 @@ async function geocode(q) {
     } catch {}
   }
 
-  // 番地・号を除いた短縮クエリを作成（例:「石川県小松市清六町315番地」→「石川県小松市清六町」）
-  const qShort = q.replace(/\d+番(地|丁目)?/, "").replace(/\d+号/, "").trim();
+  // ② 国土地理院API（日本住所・番地レベルまで対応・無料・APIキー不要）
+  try {
+    const r = await fetchWithTimeout(
+      `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`,
+      6000
+    );
+    if (r.ok) {
+      const d = await r.json();
+      if (d?.[0]?.geometry?.coordinates) {
+        const [lng, lat] = d[0].geometry.coordinates;
+        return { lat, lng };
+      }
+    }
+  } catch {}
 
-  // ② photon（施設名・店舗名に強い）- 日本のbboxで絞る
+  // ③ photon（施設名・店舗名に強い）- 日本のbboxで絞る
   try {
     const r = await fetchWithTimeout(
       `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&lang=ja&bbox=122,24,154,46`,
@@ -144,69 +186,29 @@ async function geocode(q) {
     );
     if (r.ok) {
       const d = await r.json();
-      const jp = d?.features?.find(f =>
-        f.properties?.country === "Japan" || f.properties?.country === "日本"
-      );
+      const jp = d?.features?.find(f => f.properties?.country === "Japan" || f.properties?.country === "日本");
       const f = jp || d?.features?.[0];
       if (f) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
     }
   } catch {}
 
-  // ③ Nominatim（住所検索）- フルクエリ
-  try {
-    const r = await fetchWithTimeout(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5&accept-language=ja`,
-      8000
-    );
-    if (r.ok) {
-      const d = await r.json();
-      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-    }
-  } catch {}
-
-  // ④ Nominatim - 番地を除いた短縮クエリで再試行
+  // ④ GSI - 番地を除いた短縮クエリで再試行
+  const qShort = q.replace(/\d+番(地|丁目)?/, "").replace(/[-－]\d+$/, "").trim();
   if (qShort !== q) {
     try {
       const r = await fetchWithTimeout(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qShort)}&countrycodes=jp&limit=5&accept-language=ja`,
-        8000
+        `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(qShort)}`,
+        6000
       );
       if (r.ok) {
         const d = await r.json();
-        if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+        if (d?.[0]?.geometry?.coordinates) {
+          const [lng, lat] = d[0].geometry.coordinates;
+          return { lat, lng };
+        }
       }
     } catch {}
   }
-
-  // ⑤ photon - 短縮クエリで再試行
-  if (qShort !== q) {
-    try {
-      const r = await fetchWithTimeout(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(qShort)}&limit=10&lang=ja&bbox=122,24,154,46`,
-        7000
-      );
-      if (r.ok) {
-        const d = await r.json();
-        const jp = d?.features?.find(f =>
-          f.properties?.country === "Japan" || f.properties?.country === "日本"
-        );
-        const f = jp || d?.features?.[0];
-        if (f) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
-      }
-    } catch {}
-  }
-
-  // ⑥ 最終フォールバック: 「日本」付きで Nominatim
-  try {
-    const r = await fetchWithTimeout(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + " 日本")}&limit=1&accept-language=ja`,
-      8000
-    );
-    if (r.ok) {
-      const d = await r.json();
-      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-    }
-  } catch {}
 
   return null;
 }
@@ -236,7 +238,7 @@ function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
   );
 }
 
-function SpotEditor({ spots, onUpdate, onAdd, onRemove, onMove }) {
+function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
   return (
     <div>
       {spots.map((spot,i) => (
@@ -250,9 +252,15 @@ function SpotEditor({ spots, onUpdate, onAdd, onRemove, onMove }) {
             <input value={spot.name} placeholder="場所名（例: 近江町市場）" onChange={e=>onUpdate(spot.id,"name",e.target.value)} style={{...SI,flex:1}}/>
             {spots.length>1 && <button onClick={()=>onRemove(spot.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:18,cursor:"pointer",padding:0,flexShrink:0}}>×</button>}
           </div>
-          <div style={{paddingLeft:32}}>
-            <input value={spot.address||""} placeholder="住所（任意・Gマップのリンク精度が上がります）" onChange={e=>onUpdate(spot.id,"address",e.target.value)} style={{...SI,width:"100%",boxSizing:"border-box"}}/>
+          <div style={{display:"flex",gap:6,alignItems:"center",paddingLeft:32}}>
+            <input value={spot.address||""} placeholder="住所を入力すると地図にピンが立ちます" onChange={e=>onUpdate(spot.id,"address",e.target.value)} style={{...SI,flex:1}}/>
+            <button onClick={()=>onGeocode(spot.id, spot.address||spot.name)} disabled={spot.searching||!spot.name}
+              style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(spot.searching||!spot.name)?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(spot.searching||!spot.name)?0.5:1}}>
+              {spot.searching ? "検索中…" : spot.lat ? "再取得" : "地図取得"}
+            </button>
           </div>
+          {spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:GREEN,paddingLeft:32}}>✓ 取得済</p>}
+          {spot.geoError && !spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:"#E24B4A",paddingLeft:32}}>取得できませんでした。住所を入力して再度お試しください。</p>}
         </div>
       ))}
       <button onClick={onAdd} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",marginTop:2}}>+ 場所を追加</button>
@@ -260,7 +268,7 @@ function SpotEditor({ spots, onUpdate, onAdd, onRemove, onMove }) {
   );
 }
 
-function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove }) {
+function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode }) {
   return (
     <div>
       {rows.map((row,i) => {
@@ -288,7 +296,15 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove }) {
                   </div>
                 </div>
                 <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%"}}/>
-                <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所（任意・Gマップのリンク精度が上がります）" style={{...SI,width:"100%"}}/>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所を入力すると地図にピンが立ちます" style={{...SI,flex:1}}/>
+                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={row.searching||(!row.place&&!row.content&&!row.address)}
+                    style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
+                    {row.searching ? "検索中…" : row.lat ? "再取得" : "地図取得"}
+                  </button>
+                </div>
+                {row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:GREEN}}>✓ 取得済</p>}
+                {row.geoError && !row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:"#E24B4A"}}>取得できませんでした。住所を入力して再度お試しください。</p>}
               </div>
             )}
             {trans && (
@@ -937,7 +953,7 @@ export default function App() {
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ</label><textarea value={ndMemo} onChange={e=>setNdMemo(e.target.value)} placeholder="思い出メモ..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <div style={{marginBottom:14}}>
                 <p style={{margin:"0 0 6px",fontWeight:700,fontSize:14}}>訪れた場所</p>
-                <SpotEditor spots={ndSpots} onUpdate={ndUpdSpot} onAdd={()=>setNdSpots(p=>[...p,makeSpot(Date.now())])} onRemove={id=>setNdSpots(p=>p.filter(s=>s.id!==id))} onMove={ndMoveSpot}/>
+                <SpotEditor spots={ndSpots} onUpdate={ndUpdSpot} onGeocode={ndGeoSpot} onAdd={()=>setNdSpots(p=>[...p,makeSpot(Date.now())])} onRemove={id=>setNdSpots(p=>p.filter(s=>s.id!==id))} onMove={ndMoveSpot}/>
               </div>
               <div style={{marginBottom:14}}>
                 <p style={{fontWeight:700,fontSize:14,marginBottom:8}}>写真</p>
@@ -971,7 +987,7 @@ export default function App() {
             <div style={{flex:1,overflowY:"auto",padding:"1rem 1.25rem"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ・アイデア</label><textarea value={npMemo} onChange={e=>setNpMemo(e.target.value)} placeholder="行きたいお店やアイデアなど..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
-              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched}/>
+              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>予算合計: {fmt(budgetOf(npSched))}</div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
