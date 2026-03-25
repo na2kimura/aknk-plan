@@ -33,7 +33,13 @@ const EMAIL_TO_USER = {
 const getUserName = (email) => EMAIL_TO_USER[email] || "Nk";
 const getPartnerName = (myName) => myName === "Nk" ? "Ak" : "Nk";
 // 旧データ(Natsuki/Akira)→新表示名(Nk/Ak)変換
-const toDisplayUser = (u) => u === "Natsuki" ? "Nk" : u === "Akira" ? "Ak" : u;
+const toDisplayUser = (u) => {
+  if (!u) return u;
+  const s = String(u).trim();
+  if (s === "Natsuki" || s.toUpperCase() === "NK") return "Nk";
+  if (s === "Akira"   || s.toUpperCase() === "AK") return "Ak";
+  return s;
+};
 const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観光", "食事", "宿泊", "体験", "休憩", "その他"];
 
 const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "Nk" });
@@ -42,7 +48,7 @@ const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransport(r.cat) ? s + (Number(r.natsuki?.budget)||0) + (Number(r.akira?.budget)||0) : s + (Number(r.budget)||0), 0);
-const paidByUser = (items, u, alt) => items.filter(i => i.paidBy === u || (alt && i.paidBy === alt)).reduce((s, i) => s + (Number(i.amount)||0), 0);
+const paidByUser = (items, u) => items.filter(i => toDisplayUser(i.paidBy) === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
 const getY       = (d) => d.slice(0, 4);
@@ -691,7 +697,7 @@ export default function App() {
                   <span style={{fontSize:12,color:"#888"}}>{d.count}回</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                  {[{l:"合計費用",v:fmt(d.total),c:"#888"},{l:"Nk",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Nk","Natsuki"),0)),c:USER_COLORS.Nk},{l:"Ak",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Ak","Akira"),0)),c:USER_COLORS.Ak}].map(s=>(
+                  {[{l:"合計費用",v:fmt(d.total),c:"#888"},{l:"Nk",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Nk"),0)),c:USER_COLORS.Nk},{l:"Ak",v:fmt(dates.filter(dt=>getY(dt.date)===y).reduce((s,dt)=>s+paidByUser(dt.items||[],"Ak"),0)),c:USER_COLORS.Ak}].map(s=>(
                     <div key={s.l} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
                       <p style={{margin:0,fontSize:10,color:s.c}}>{s.l}</p>
                       <p style={{margin:"3px 0 0",fontWeight:700,fontSize:14}}>{s.v}</p>
@@ -775,17 +781,20 @@ export default function App() {
               <button onClick={()=>setShowBulk(true)} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>+ 一括入力</button>
             </div>
             <div style={CS}>
-              {(selDate.items||[]).map((item,i)=>(
-                <div key={item.id||i} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"4px 12px",padding:"7px 0",borderBottom:i<selDate.items.length-1?"1px solid #f0f0f0":"none",alignItems:"center"}}>
-                  <span style={{fontSize:14}}>{itemLabel(item)}</span>
-                  <span style={{fontSize:11,padding:"1px 7px",borderRadius:20,background:(USER_COLORS[item.paidBy]||"#888")+"22",color:USER_COLORS[item.paidBy]||"#888",whiteSpace:"nowrap"}}>{toDisplayUser(item.paidBy)}</span>
-                  <span style={{fontWeight:500,fontSize:14,textAlign:"right"}}>{fmt(item.amount)}</span>
-                </div>
-              ))}
+              {(selDate.items||[]).map((item,i)=>{
+                const displayUser = toDisplayUser(item.paidBy);
+                return (
+                  <div key={item.id||i} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"4px 12px",padding:"7px 0",borderBottom:i<selDate.items.length-1?"1px solid #f0f0f0":"none",alignItems:"center"}}>
+                    <span style={{fontSize:14}}>{itemLabel(item)}</span>
+                    <span style={{fontSize:11,padding:"1px 7px",borderRadius:20,background:(USER_COLORS[displayUser]||"#888")+"22",color:USER_COLORS[displayUser]||"#888",whiteSpace:"nowrap"}}>{displayUser}</span>
+                    <span style={{fontWeight:500,fontSize:14,textAlign:"right"}}>{fmt(item.amount)}</span>
+                  </div>
+                );
+              })}
               <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee"}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16,marginBottom:6}}><span>合計</span><span style={{color:GREEN}}>{fmt(totalOf(selDate.items||[]))}</span></div>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                  {[["Nk","Natsuki"],["Ak","Akira"]].map(([u,alt])=>{const t=paidByUser(selDate.items||[],u,alt);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                  {["Nk","Ak"].map(u=>{const t=paidByUser(selDate.items||[],u);return t>0?<span key={u} style={{fontSize:12,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                 </div>
               </div>
             </div>
@@ -1007,7 +1016,7 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{fontWeight:500}}>{d.title}</span><span style={{fontWeight:700}}>{fmt(dispTotal)}</span></div>
                     <div style={{display:"flex",gap:10,marginTop:3,flexWrap:"wrap"}}>
                       <span style={{fontSize:11,color:"#aaa"}}>{d.date}</span>
-                      {filterCat==="すべて"&&[["Nk","Natsuki"],["Ak","Akira"]].map(([u,alt])=>{const t=paidByUser(d.items||[],u,alt);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
+                      {filterCat==="すべて"&&["Nk","Ak"].map(u=>{const t=paidByUser(d.items||[],u);return t>0?<span key={u} style={{fontSize:11,color:USER_COLORS[u]}}>{u}: {fmt(t)}</span>:null;})}
                     </div>
                   </div>
                 );
