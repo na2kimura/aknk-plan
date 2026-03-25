@@ -1006,9 +1006,9 @@ export default function App() {
                   const transportTotal = catSummary.filter(([cat])=>isTransportCat(cat)).reduce((s,[,t])=>s+t,0);
                   if(!transportTotal) return null;
                   return (
-                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f0f0",fontSize:13,background:"#f0f9f5",margin:"0 -4px",padding:"6px 4px",borderRadius:4}}>
-                      <span style={{color:GREEN,fontWeight:600}}>🚃 交通費合計</span>
-                      <span style={{fontWeight:700,color:GREEN}}>{fmt(transportTotal)}</span>
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f0f0",fontSize:13}}>
+                      <span style={{fontWeight:700,color:"#333"}}>交通費合計</span>
+                      <span style={{fontWeight:700,color:"#333"}}>{fmt(transportTotal)}</span>
                     </div>
                   );
                 })()}
