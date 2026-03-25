@@ -76,44 +76,61 @@ function LoginScreen({ onLogin, error, loading }) {
 // ── Map ──
 function SpotMap({ spots }) {
   const ref = useRef(null), inst = useRef(null);
-  const valid = spots.filter(s => s.lat && s.lng && s.name);
+  // lat/lngあり → 地図に表示
+  const withCoords = spots.filter(s => s.lat && s.lng && s.name);
+  // 場所名だけでもリスト表示（lat/lngなくてもOK）
+  const allNamed = spots.filter(s => s.name);
+
   useEffect(() => {
-    if (!ref.current || !valid.length) return;
+    if (!ref.current || !withCoords.length) return;
     const init = () => {
       try {
         if (inst.current) { inst.current.remove(); inst.current = null; }
         if (!ref.current) return;
         ref.current._leaflet_id = null;
         const L = window.L;
-        const cx = valid.length === 1 ? [valid[0].lat, valid[0].lng]
-          : [valid.reduce((s,sp)=>s+sp.lat,0)/valid.length, valid.reduce((s,sp)=>s+sp.lng,0)/valid.length];
-        const map = L.map(ref.current).setView(cx, valid.length===1?14:12);
+        const cx = withCoords.length === 1 ? [withCoords[0].lat, withCoords[0].lng]
+          : [withCoords.reduce((s,sp)=>s+sp.lat,0)/withCoords.length, withCoords.reduce((s,sp)=>s+sp.lng,0)/withCoords.length];
+        const map = L.map(ref.current).setView(cx, withCoords.length===1?14:12);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
-        valid.forEach((sp,i) => {
-          const icon = L.divIcon({ html:`<div style="background:${GREEN};color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.2)">${i+1}</div>`, className:"", iconSize:[26,26], iconAnchor:[13,13] });
+        // マーカーの番号はallNamedの中での順番に合わせる
+        withCoords.forEach((sp) => {
+          const idx = allNamed.findIndex(s => s.id === sp.id || s.name === sp.name);
+          const num = idx >= 0 ? idx + 1 : "•";
+          const icon = L.divIcon({ html:`<div style="background:${GREEN};color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.2)">${num}</div>`, className:"", iconSize:[26,26], iconAnchor:[13,13] });
           L.marker([sp.lat,sp.lng],{icon}).addTo(map).bindPopup(`<b>${sp.name}</b><br><a href="https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}" target="_blank" style="color:${GREEN};font-size:12px">Googleマップで開く</a>`);
         });
-        if (valid.length > 1) map.fitBounds(L.latLngBounds(valid.map(sp=>[sp.lat,sp.lng])),{padding:[30,30]});
+        if (withCoords.length > 1) map.fitBounds(L.latLngBounds(withCoords.map(sp=>[sp.lat,sp.lng])),{padding:[30,30]});
         inst.current = map;
       } catch(e) { console.error("Map init error:", e); }
     };
     if (!document.getElementById("lf-css")) { const lk=document.createElement("link");lk.id="lf-css";lk.rel="stylesheet";lk.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(lk); }
     window.L ? init() : (() => { if (!document.getElementById("lf-js")) { const sc=document.createElement("script");sc.id="lf-js";sc.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";sc.onload=()=>setTimeout(init,50);document.head.appendChild(sc); } else setTimeout(init,200); })();
     return () => { try { if (inst.current) { inst.current.remove(); inst.current=null; } } catch(e){} };
-  }, [JSON.stringify(valid)]);
-  if (!valid.length) return null;
+  }, [JSON.stringify(withCoords)]);
+
+  if (!allNamed.length) return null;
   return (
     <div>
-      <div ref={ref} style={{width:"100%",height:200,borderRadius:10,overflow:"hidden",border:"1px solid #eee",marginBottom:8}}/>
+      {/* 座標がある場合のみ地図を表示 */}
+      {withCoords.length > 0 && (
+        <div ref={ref} style={{width:"100%",height:200,borderRadius:10,overflow:"hidden",border:"1px solid #eee",marginBottom:8}}/>
+      )}
       <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {valid.map((sp,i) => (
-          <a key={i} href={`https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}`} target="_blank" rel="noreferrer"
-            style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",textDecoration:"none",padding:"5px 8px",borderRadius:7,background:"#f7f7f7"}}>
-            <span style={{background:GREEN,color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-            <span style={{flex:1}}>{sp.name}</span>
-            <span style={{fontSize:11,color:GREEN}}>Gマップ</span>
-          </a>
-        ))}
+        {allNamed.map((sp,i) => {
+          // lat/lngがある場合は座標検索リンク、ない場合は場所名検索リンク
+          const mapUrl = sp.lat && sp.lng
+            ? `https://www.google.com/maps/search/?api=1&query=${sp.lat},${sp.lng}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.name)}`;
+          return (
+            <a key={i} href={mapUrl} target="_blank" rel="noreferrer"
+              style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",textDecoration:"none",padding:"5px 8px",borderRadius:7,background:"#f7f7f7"}}>
+              <span style={{background:sp.lat?GREEN:"#bbb",color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
+              <span style={{flex:1}}>{sp.name}</span>
+              <span style={{fontSize:11,color:GREEN}}>Gマップ</span>
+            </a>
+          );
+        })}
       </div>
     </div>
   );
@@ -121,20 +138,33 @@ function SpotMap({ spots }) {
 
 async function geocode(q) {
   const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
-  const fetchWithTimeout = async (url, ms = 5000) => Promise.race([fetch(url), timeout(ms)]);
+  const fetchWithTimeout = async (url, ms = 6000) => Promise.race([fetch(url), timeout(ms)]);
+
+  // Nominatim（OpenStreetMap）をメインに使用 - 日本語の場所名・施設名に強い
+  // countrycodes=jp で日本限定、accept-language=ja で日本語優先
   try {
-    const r = await fetchWithTimeout(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`, 5000);
+    const r = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=3&accept-language=ja`,
+      6000
+    );
     if (r.ok) {
       const d = await r.json();
-      const jp = d?.features?.find(f => f.properties?.country === "Japan" || f.properties?.country === "日本");
-      const f = jp || d?.features?.[0];
-      if (f) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
     }
   } catch {}
+
+  // フォールバック: クエリに「日本」を付けて再検索
   try {
-    const r = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=1`, 5000);
-    if (r.ok) { const d = await r.json(); if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }; }
+    const r = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + " 日本")}&limit=1&accept-language=ja`,
+      6000
+    );
+    if (r.ok) {
+      const d = await r.json();
+      if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+    }
   } catch {}
+
   return null;
 }
 
@@ -609,10 +639,10 @@ export default function App() {
                 </div>
               </div>
             )}
-            {(selDate.spots||[]).filter(s=>s.lat).length>0&&(
+            {(selDate.spots||[]).filter(s=>s.name).length>0&&(
               <div style={{marginBottom:12}}>
                 <p style={{fontWeight:700,fontSize:14,marginBottom:8}}>訪れた場所</p>
-                <SpotMap spots={selDate.spots.filter(s=>s.lat)}/>
+                <SpotMap spots={selDate.spots.filter(s=>s.name)}/>
               </div>
             )}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
