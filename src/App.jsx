@@ -236,7 +236,7 @@ function RowEditor({ rows, onUpdate, onAdd, onRemove }) {
   );
 }
 
-function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove, searching }) {
+function SpotEditor({ spots, onUpdate, onAdd, onRemove, onMove }) {
   return (
     <div>
       {spots.map((spot,i) => (
@@ -250,15 +250,9 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove, searc
             <input value={spot.name} placeholder="場所名（例: 近江町市場）" onChange={e=>onUpdate(spot.id,"name",e.target.value)} style={{...SI,flex:1}}/>
             {spots.length>1 && <button onClick={()=>onRemove(spot.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:18,cursor:"pointer",padding:0,flexShrink:0}}>×</button>}
           </div>
-          <div style={{display:"flex",gap:6,alignItems:"center",paddingLeft:32}}>
-            <input value={spot.address||""} placeholder="住所（任意・より正確に取得できます）" onChange={e=>onUpdate(spot.id,"address",e.target.value)} style={{...SI,flex:1}}/>
-            <button onClick={()=>onGeocode(spot.id, spot.address||spot.name)} disabled={spot.searching||!spot.name}
-              style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(spot.searching||!spot.name)?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(spot.searching||!spot.name)?0.5:1}}>
-              {spot.searching?"検索中...":(spot.lat?"再取得":"位置取得")}
-            </button>
+          <div style={{paddingLeft:32}}>
+            <input value={spot.address||""} placeholder="住所（任意・Gマップのリンク精度が上がります）" onChange={e=>onUpdate(spot.id,"address",e.target.value)} style={{...SI,width:"100%",boxSizing:"border-box"}}/>
           </div>
-          {spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:GREEN,paddingLeft:32}}>✓ 取得済</p>}
-          {spot.geoError && !spot.lat && <p style={{margin:"4px 0 0",fontSize:11,color:"#E24B4A",paddingLeft:32}}>取得できませんでした。住所欄に「石川県小松市清六町」のように都道府県〜町名で入力すると取得しやすくなります。</p>}
         </div>
       ))}
       <button onClick={onAdd} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",marginTop:2}}>+ 場所を追加</button>
@@ -266,7 +260,7 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove, searc
   );
 }
 
-function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onGeocode, onMove, searching }) {
+function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove }) {
   return (
     <div>
       {rows.map((row,i) => {
@@ -294,15 +288,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onGeocode, onMove, se
                   </div>
                 </div>
                 <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%"}}/>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所（任意）" style={{...SI,flex:1}}/>
-                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={row.searching||(!row.place&&!row.content&&!row.address)}
-                    style={{padding:"7px 10px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:12,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
-                    {row.searching?"検索中...":(row.lat?"再取得":"地図取得")}
-                  </button>
-                </div>
-                {row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:GREEN}}>取得済</p>}
-                {row.geoError && !row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:"#E24B4A"}}>取得できませんでした。住所をより詳しく入力してください。</p>}
+                <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所（任意・Gマップのリンク精度が上がります）" style={{...SI,width:"100%"}}/>
               </div>
             )}
             {trans && (
@@ -951,7 +937,7 @@ export default function App() {
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ</label><textarea value={ndMemo} onChange={e=>setNdMemo(e.target.value)} placeholder="思い出メモ..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <div style={{marginBottom:14}}>
                 <p style={{margin:"0 0 6px",fontWeight:700,fontSize:14}}>訪れた場所</p>
-                <SpotEditor spots={ndSpots} onUpdate={ndUpdSpot} onGeocode={ndGeoSpot} onAdd={()=>setNdSpots(p=>[...p,makeSpot(Date.now())])} onRemove={id=>setNdSpots(p=>p.filter(s=>s.id!==id))} onMove={ndMoveSpot} searching={ndSearch}/>
+                <SpotEditor spots={ndSpots} onUpdate={ndUpdSpot} onAdd={()=>setNdSpots(p=>[...p,makeSpot(Date.now())])} onRemove={id=>setNdSpots(p=>p.filter(s=>s.id!==id))} onMove={ndMoveSpot}/>
               </div>
               <div style={{marginBottom:14}}>
                 <p style={{fontWeight:700,fontSize:14,marginBottom:8}}>写真</p>
@@ -985,7 +971,7 @@ export default function App() {
             <div style={{flex:1,overflowY:"auto",padding:"1rem 1.25rem"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ・アイデア</label><textarea value={npMemo} onChange={e=>setNpMemo(e.target.value)} placeholder="行きたいお店やアイデアなど..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
-              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onGeocode={npGeoSched} onMove={npMoveSched} searching={npSearch}/>
+              <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>予算合計: {fmt(budgetOf(npSched))}</div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
