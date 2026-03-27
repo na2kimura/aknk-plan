@@ -41,7 +41,7 @@ const toDisplayUser = (u) => {
   if (s === "Akira"   || s.toUpperCase() === "AK") return "Ak";
   return s;
 };
-const SCHEDULE_CATS = ["行き", "帰り", "移動", "食事・カフェ", "体験", "買い物", "C/I", "C/O", "その他"];
+const SCHEDULE_CATS = ["行き", "帰り", "移動", "食事・カフェ", "体験", "買い物", "宿泊", "C/I", "C/O", "その他"];
 const MOVE_METHODS  = ["電車", "徒歩", "車", "その他"];
 const CAT_DISPLAY   = { "C/I": "チェックイン", "C/O": "チェックアウト" };
 const catDisplay    = (cat) => CAT_DISPLAY[cat] || cat;
@@ -330,7 +330,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
         const isMove  = isMoveCat(row.cat);
         const dayOff  = row.dayOffset ?? 0;
         return (
-          <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee",minWidth:0,boxSizing:"border-box"}}>
+          <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:16,border:"1px solid #eee",minWidth:0,boxSizing:"border-box"}}>
             {/* 上段：並び替え／カテゴリ／内容／削除 */}
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,minWidth:0}}>
               <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
