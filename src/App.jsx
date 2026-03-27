@@ -761,7 +761,7 @@ export default function App() {
 
       {loading && <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:14}}>データを読み込み中...</div>}
 
-      <div style={{flex:1,overflowY:"auto"}}>
+      <div style={{flex:1,overflowY:"auto",paddingBottom:40}}>
 
         {/* HOME */}
         {activeTab==="ホーム"&&!loading&&(
