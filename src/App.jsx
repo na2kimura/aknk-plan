@@ -41,21 +41,28 @@ const toDisplayUser = (u) => {
   if (s === "Akira"   || s.toUpperCase() === "AK") return "Ak";
   return s;
 };
-const SCHEDULE_CATS = ["移動（行き）", "移動（帰り）", "場所・観光", "食事", "宿泊", "体験", "休憩", "その他"];
+const SCHEDULE_CATS = ["行き", "帰り", "移動", "食事・カフェ", "体験", "買い物", "C/I", "C/O", "その他"];
+const MOVE_METHODS  = ["電車", "徒歩", "車", "その他"];
+const CAT_DISPLAY   = { "C/I": "チェックイン", "C/O": "チェックアウト" };
+const catDisplay    = (cat) => CAT_DISPLAY[cat] || cat;
 
 const makeRow   = (id) => ({ id, cat: "食事", note: "", amount: "", paidBy: "Nk" });
 const makeSpot  = (id) => ({ id, name: "", address: "", lat: "", lng: "" });
-const makeSched = (id) => ({ id, cat: "食事", content: "", budget: "", time: "", place: "", address: "", lat: "", lng: "", dayOffset: 0, natsuki: { time: "", from: "", budget: "" }, akira: { time: "", from: "", budget: "" } });
+const makeSched = (id) => ({ id, cat: "食事・カフェ", content: "", budget: "", time: "", place: "", address: "", lat: "", lng: "", dayOffset: 0, moveMethod: "電車", natsuki: { depTime: "", depPlace: "", arrTime: "", arrPlace: "", budget: "" }, akira: { depTime: "", depPlace: "", arrTime: "", arrPlace: "", budget: "" } });
+const makeCheckItem = (id) => ({ id, text: "", checked: false });
+const makeLink      = (id) => ({ id, label: "", url: "" });
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-const budgetOf   = (rows)  => rows.reduce((s, r) => isTransport(r.cat) ? s + (Number(r.natsuki?.budget)||0) + (Number(r.akira?.budget)||0) : s + (Number(r.budget)||0), 0);
+const budgetOf   = (rows)  => rows.reduce((s, r) => isTransportCatSched(r.cat) ? s + (Number(r.natsuki?.budget)||0) + (Number(r.akira?.budget)||0) : s + (Number(r.budget)||0), 0);
 const paidByUser = (items, u) => items.filter(i => toDisplayUser(i.paidBy) === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
 const getY       = (d) => d.slice(0, 4);
 const itemLabel  = (item) => item.cat === "その他" && item.note ? item.note : item.cat + (item.note && item.cat !== "その他" ? `（${item.note}）` : "");
-const isTransport = (cat) => cat === "移動（行き）" || cat === "移動（帰り）";
-const isReturn    = (cat) => cat === "移動（帰り）";
+const isTransportCatSched = (cat) => cat === "行き" || cat === "帰り";
+const isMoveCat   = (cat) => cat === "移動";
+const isTransport = (cat) => isTransportCatSched(cat); // 後方互換
+const isReturn    = (cat) => cat === "帰り";
 
 const ALL_YEARS  = ["すべて"];
 const ALL_MONTHS = ["すべて","01月","02月","03月","04月","05月","06月","07月","08月","09月","10月","11月","12月"];
@@ -285,7 +292,6 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
 }
 
 function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, baseDate }) {
-  // 基準日から日付ラベルを生成（最大7日）
   const dayOptions = Array.from({length:7}, (_,i) => {
     if (!baseDate) return { value: i, label: `${i+1}日目` };
     const d = new Date(baseDate);
@@ -294,80 +300,133 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, ba
     return { value: i, label: `${i+1}日目（${m}/${day}）` };
   });
 
+  const timeSelects = (value, onChange, step1min=false) => {
+    const hVal = value ? value.split(":")[0] : "";
+    const mVal = value ? value.split(":")[1]||"00" : "";
+    const mins = step1min
+      ? Array.from({length:60},(_,i)=>String(i).padStart(2,"0"))
+      : ["00","15","30","45"];
+    return (
+      <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
+        <select value={hVal} onChange={e=>{const m=mVal||"00";onChange(e.target.value?`${e.target.value}:${m}`:"");}}
+          style={{...SI,width:52,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
+          <option value="">--</option>
+          {Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,"0")}>{String(i).padStart(2,"0")}</option>)}
+        </select>
+        <span style={{fontSize:13,color:"#888"}}>:</span>
+        <select value={mVal||""} onChange={e=>{const h=hVal||"00";onChange(hVal||e.target.value?`${h}:${e.target.value}`:"");}}
+          style={{...SI,width:step1min?52:50,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
+          {!step1min&&<option value="">--</option>}
+          {mins.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
+    );
+  };
+
   return (
     <div style={{width:"100%",minWidth:0}}>
       {rows.map((row,i) => {
-        const trans = isTransport(row.cat), ret = isReturn(row.cat);
-        const dayOff = row.dayOffset ?? 0;
+        const isTrans = isTransportCatSched(row.cat);
+        const isMove  = isMoveCat(row.cat);
+        const dayOff  = row.dayOffset ?? 0;
         return (
           <div key={row.id} style={{background:"#f9f9f9",borderRadius:10,padding:"10px 12px",marginBottom:8,border:"1px solid #eee",minWidth:0,boxSizing:"border-box"}}>
+            {/* 上段：並び替え／カテゴリ／内容／削除 */}
             <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,minWidth:0}}>
               <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
                 <button onClick={()=>onMove(i,-1)} disabled={i===0} style={{background:"none",border:"none",color:i===0?"#ddd":"#aaa",cursor:i===0?"default":"pointer",padding:"0 2px",fontSize:12,lineHeight:1}}>▲</button>
                 <button onClick={()=>onMove(i,1)} disabled={i===rows.length-1} style={{background:"none",border:"none",color:i===rows.length-1?"#ddd":"#aaa",cursor:i===rows.length-1?"default":"pointer",padding:"0 2px",fontSize:12,lineHeight:1}}>▼</button>
               </div>
-              <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px",flexShrink:0,maxWidth:120}}>
+              <select value={row.cat} onChange={e=>onUpdate(row.id,"cat",e.target.value)} style={{...SI,padding:"7px 4px",flexShrink:0,maxWidth:110}}>
                 {SCHEDULE_CATS.map(c=><option key={c}>{c}</option>)}
               </select>
               <input value={row.content} onChange={e=>onUpdate(row.id,"content",e.target.value)} placeholder="内容" style={{...SI,flex:1,minWidth:0}}/>
               <button onClick={()=>onRemove(row.id)} style={{background:"none",border:"none",color:"#ccc",fontSize:16,cursor:"pointer",padding:0,flexShrink:0}}>×</button>
             </div>
+
             {/* 日付セレクト */}
-            <div style={{paddingLeft:32,marginBottom:6}}>
+            <div style={{paddingLeft:32,marginBottom:8}}>
               <select value={dayOff} onChange={e=>onUpdate(row.id,"dayOffset",Number(e.target.value))}
                 style={{...SI,fontSize:12,padding:"5px 8px",background:"#fff",color:GREEN,fontWeight:600,border:`1px solid ${GREEN}44`}}>
                 {dayOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            {!trans && (
-              <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
+
+            {/* 行き・帰り：NkAk別 */}
+            {isTrans && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%",boxSizing:"border-box"}}>
+                {[["natsuki","Nk"],["akira","Ak"]].map(([who,label]) => {
+                  const d = row[who] || {};
+                  const color = USER_COLORS[label];
+                  return (
+                    <div key={who} style={{background:"#fff",borderRadius:8,padding:"10px 12px",border:`1px solid ${color}33`,boxSizing:"border-box"}}>
+                      <p style={{margin:"0 0 7px",fontSize:12,fontWeight:700,color}}>{label}</p>
+                      {timeSelects(d.depTime||"", v=>onUpdate(row.id,`${who}_depTime`,v), true)}
+                      <input value={d.depPlace||""} onChange={e=>onUpdate(row.id,`${who}_depPlace`,e.target.value)}
+                        placeholder="出発地" style={{...SI,width:"100%",boxSizing:"border-box",marginTop:5}}/>
+                      <p style={{fontSize:11,color:"#bbb",textAlign:"center",margin:"3px 0"}}>↓</p>
+                      {timeSelects(d.arrTime||"", v=>onUpdate(row.id,`${who}_arrTime`,v), true)}
+                      <input value={d.arrPlace||""} onChange={e=>onUpdate(row.id,`${who}_arrPlace`,e.target.value)}
+                        placeholder="到着地" style={{...SI,width:"100%",boxSizing:"border-box",marginTop:5}}/>
+                      <p style={{fontSize:11,color:"#aaa",margin:"6px 0 3px"}}>予算 ¥</p>
+                      <input type="number" value={d.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)}
+                        placeholder="0" style={{...SI,width:"100%",boxSizing:"border-box",textAlign:"right"}}/>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 移動：手段＋出発着（1分単位） */}
+            {isMove && (
+              <div style={{display:"flex",flexDirection:"column",gap:6,width:"100%",boxSizing:"border-box"}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
-                    <select value={row.time ? row.time.split(":")[0] : ""} onChange={e=>{const m=row.time?row.time.split(":")[1]||"00":"00";onUpdate(row.id,"time",e.target.value?`${e.target.value}:${m}`:"");}}
-                      style={{...SI,width:56,padding:"7px 4px",boxSizing:"border-box",fontSize:13}}>
-                      <option value="">--</option>
-                      {Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,"0")}>{String(i).padStart(2,"0")}</option>)}
-                    </select>
-                    <span style={{fontSize:13,color:"#888"}}>:</span>
-                    <select value={row.time ? row.time.split(":")[1]||"00" : ""} onChange={e=>{const h=row.time?row.time.split(":")[0]||"00":"00";onUpdate(row.id,"time",row.time||h?`${h||"00"}:${e.target.value}`:"");}}
-                      style={{...SI,width:52,padding:"7px 4px",boxSizing:"border-box",fontSize:13}}>
-                      <option value="">--</option>
-                      {["00","15","30","45"].map(m=><option key={m} value={m}>{m}</option>)}
-                    </select>
+                  <span style={{fontSize:12,color:"#888",flexShrink:0}}>移動手段</span>
+                  <select value={row.moveMethod||"電車"} onChange={e=>onUpdate(row.id,"moveMethod",e.target.value)} style={{...SI,padding:"7px 6px"}}>
+                    {MOVE_METHODS.map(m=><option key={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div>
+                    <p style={{fontSize:11,color:"#888",marginBottom:4}}>出発</p>
+                    {timeSelects(row.depTime||"", v=>onUpdate(row.id,"depTime",v), true)}
+                    <input value={row.depPlace||""} onChange={e=>onUpdate(row.id,"depPlace",e.target.value)}
+                      placeholder="出発地" style={{...SI,width:"100%",boxSizing:"border-box",marginTop:5}}/>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
-                    <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)} placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
+                  <div>
+                    <p style={{fontSize:11,color:"#888",marginBottom:4}}>到着</p>
+                    {timeSelects(row.arrTime||"", v=>onUpdate(row.id,"arrTime",v), true)}
+                    <input value={row.arrPlace||""} onChange={e=>onUpdate(row.id,"arrPlace",e.target.value)}
+                      placeholder="到着地" style={{...SI,width:"100%",boxSizing:"border-box",marginTop:5}}/>
                   </div>
                 </div>
-                <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)} placeholder="場所名（例: 近江町市場）" style={{...SI,width:"100%",boxSizing:"border-box"}}/>
+              </div>
+            )}
+
+            {/* その他（食事・カフェ / 体験 / 買い物 / C/I / C/O / その他）：15分刻み */}
+            {!isTrans && !isMove && (
+              <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  {timeSelects(row.time||"", v=>onUpdate(row.id,"time",v), false)}
+                  <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
+                    <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
+                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
+                      placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
+                  </div>
+                </div>
+                <input value={row.place||""} onChange={e=>onUpdate(row.id,"place",e.target.value)}
+                  placeholder="場所名" style={{...SI,width:"100%",boxSizing:"border-box"}}/>
                 <div style={{display:"flex",gap:6,alignItems:"center",minWidth:0}}>
-                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)} placeholder="住所を入力すると地図にピンが立ちます" style={{...SI,flex:1,minWidth:0}}/>
-                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)} disabled={row.searching||(!row.place&&!row.content&&!row.address)}
+                  <input value={row.address||""} onChange={e=>onUpdate(row.id,"address",e.target.value)}
+                    placeholder="住所を入力すると地図にピンが立ちます" style={{...SI,flex:1,minWidth:0}}/>
+                  <button onClick={()=>onGeocode(row.id, row.address||row.place||row.content)}
+                    disabled={row.searching||(!row.place&&!row.content&&!row.address)}
                     style={{padding:"7px 8px",borderRadius:7,border:"none",background:GREEN,color:"#fff",fontSize:11,cursor:(row.searching||(!row.place&&!row.content&&!row.address))?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0,opacity:(row.searching||(!row.place&&!row.content&&!row.address))?0.5:1}}>
                     {row.searching ? "検索中…" : row.lat ? "再取得" : "地図取得"}
                   </button>
                 </div>
                 {row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:GREEN}}>✓ 取得済</p>}
                 {row.geoError && !row.lat && <p style={{margin:"2px 0 0",fontSize:11,color:"#E24B4A"}}>取得できませんでした。住所を入力して再度お試しください。</p>}
-              </div>
-            )}
-            {trans && (
-              <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%",boxSizing:"border-box"}}>
-                {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label]) => (
-                  <div key={who} style={{background:"#fff",borderRadius:8,padding:"10px 12px",border:`1px solid ${USER_COLORS[label]}33`,boxSizing:"border-box"}}>
-                    <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                    <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
-                      <input type="time" step="60" value={row[who]?.time||""} onChange={e=>onUpdate(row.id,`${who}_time`,e.target.value)} style={{...SI,width:110,flexShrink:0,boxSizing:"border-box"}}/>
-                      <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
-                        <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                        <input type="number" value={row[who]?.budget||""} onChange={e=>onUpdate(row.id,`${who}_budget`,e.target.value)} placeholder="0" style={{...SI,flex:1,textAlign:"right",minWidth:0,boxSizing:"border-box"}}/>
-                      </div>
-                    </div>
-                    <input value={row[who]?.from||""} onChange={e=>onUpdate(row.id,`${who}_from`,e.target.value)}
-                      placeholder={ret?"目的地（例: 福井駅）":"出発地（例: 福井駅）"} style={{...SI,width:"100%",boxSizing:"border-box"}}/>
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -420,6 +479,8 @@ export default function App() {
   const [npDate,   setNpDate]   = useState("");
   const [npMemo,   setNpMemo]   = useState("");
   const [npSched,  setNpSched]  = useState([makeSched(1)]);
+  const [npChecks, setNpChecks] = useState({ Nk: [makeCheckItem(1)], Ak: [makeCheckItem(2)] });
+  const [npLinks,  setNpLinks]  = useState([makeLink(1)]);
   const [npSearch, setNpSearch] = useState(false);
 
   const [bulkRows, setBulkRows] = useState(Array.from({length:5},(_,i)=>makeRow(i+1)));
@@ -519,7 +580,7 @@ export default function App() {
   },[filtered,filterCat,filteredTot]);
 
   const planSpots = (plan) => (plan.schedule||[])
-    .filter(s => !isTransport(s.cat) && (s.place||s.content))
+    .filter(s => !isTransportCatSched(s.cat) && !isMoveCat(s.cat) && (s.place||s.content))
     .map((s,i) => ({id:s.id||i, name:s.place||s.content||"スポット", address:s.address||"", lat:s.lat||"", lng:s.lng||""}));
 
   // ── Date form ──
@@ -609,13 +670,9 @@ export default function App() {
   // ── Plan form ──
   const npUpdSched = (id,field,val) => setNpSched(p=>p.map(r=>{
     if(r.id!==id) return r;
-    if(field==="natsuki_time")   return {...r,natsuki:{...r.natsuki,time:val}};
-    if(field==="natsuki_from")   return {...r,natsuki:{...r.natsuki,from:val}};
-    if(field==="natsuki_budget") return {...r,natsuki:{...r.natsuki,budget:val}};
-    if(field==="akira_time")     return {...r,akira:{...r.akira,time:val}};
-    if(field==="akira_from")     return {...r,akira:{...r.akira,from:val}};
-    if(field==="akira_budget")   return {...r,akira:{...r.akira,budget:val}};
-    if(field==="dayOffset")      return {...r,dayOffset:val};
+    if(field.startsWith("natsuki_")) return {...r,natsuki:{...r.natsuki,[field.slice(8)]:val}};
+    if(field.startsWith("akira_"))   return {...r,akira:{...r.akira,[field.slice(6)]:val}};
+    if(field==="dayOffset") return {...r,dayOffset:val};
     return {...r,[field]:val};
   }));
   const npGeoSched = async(id,q) => {
@@ -631,12 +688,27 @@ export default function App() {
     const a=[...p], j=i+dir;
     if(j<0||j>=a.length)return p; [a[i],a[j]]=[a[j],a[i]]; return a;
   });
-  const openAddPlan = () => { setEditPlanId(null); setNpTitle(""); setNpDate(""); setNpMemo(""); setNpSched([makeSched(1)]); setShowAddPlan(true); };
-  const openEditPlan = (plan) => { setEditPlanId(plan.id); setNpTitle(plan.title); setNpDate(plan.date); setNpMemo(plan.memo||""); setNpSched((plan.schedule||[]).map(s=>({...s,natsuki:{...s.natsuki},akira:{...s.akira}}))); setShowAddPlan(true); };
+  const openAddPlan = () => {
+    setEditPlanId(null); setNpTitle(""); setNpDate(""); setNpMemo("");
+    setNpSched([makeSched(1)]);
+    setNpChecks({ Nk: [makeCheckItem(Date.now())], Ak: [makeCheckItem(Date.now()+1)] });
+    setNpLinks([makeLink(Date.now()+2)]);
+    setShowAddPlan(true);
+  };
+  const openEditPlan = (plan) => {
+    setEditPlanId(plan.id); setNpTitle(plan.title); setNpDate(plan.date); setNpMemo(plan.memo||"");
+    setNpSched((plan.schedule||[]).map(s=>({...s, natsuki:{...s.natsuki}, akira:{...s.akira}})));
+    setNpChecks({
+      Nk: (plan.checks?.Nk||[makeCheckItem(Date.now())]).map(c=>({...c})),
+      Ak: (plan.checks?.Ak||[makeCheckItem(Date.now()+1)]).map(c=>({...c})),
+    });
+    setNpLinks((plan.links||[makeLink(Date.now()+2)]).map(l=>({...l})));
+    setShowAddPlan(true);
+  };
   const savePlan = async () => {
     if(!npTitle||!npDate) return;
     setSaving(true);
-    const data = { title:npTitle, date:npDate, memo:npMemo, status:"計画中", schedule:npSched };
+    const data = { title:npTitle, date:npDate, memo:npMemo, status:"計画中", schedule:npSched, checks:npChecks, links:npLinks };
     try {
       if(editPlanId) {
         await updateDoc(doc(db,"plans",editPlanId), data);
@@ -694,6 +766,41 @@ export default function App() {
         {/* HOME */}
         {activeTab==="ホーム"&&!loading&&(
           <div style={{padding:"1rem"}}>
+            {/* あと〇日バナー */}
+            {(()=>{
+              const nextPlan = [...plans].filter(p=>p.status==="計画中").sort((a,b)=>a.date.localeCompare(b.date))[0];
+              if(!nextPlan) return null;
+              const today = new Date(); today.setHours(0,0,0,0);
+              const target = new Date(nextPlan.date); target.setHours(0,0,0,0);
+              const diff = Math.round((target-today)/(1000*60*60*24));
+              const dateLabel = `${target.getFullYear()}年${target.getMonth()+1}月${target.getDate()}日`;
+              if(diff===1) {
+                // 前日：緑背景
+                return (
+                  <div onClick={()=>{setSelPlanId(nextPlan.id);setActiveTab("計画");}} style={{background:GREEN,borderRadius:12,padding:"16px 18px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+                    <div><p style={{margin:"0 0 3px",fontSize:11,color:"rgba(255,255,255,0.75)"}}>次のデート</p><p style={{margin:"0 0 2px",fontSize:15,fontWeight:700,color:"#fff"}}>{nextPlan.title}</p><p style={{margin:0,fontSize:12,color:"rgba(255,255,255,0.75)"}}>{dateLabel}</p></div>
+                    <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:44,fontWeight:700,color:"#fff",lineHeight:1}}>{diff}</p><p style={{margin:"2px 0 0",fontSize:13,color:"rgba(255,255,255,0.85)"}}>日後</p></div>
+                  </div>
+                );
+              } else if(diff===0) {
+                // 当日：白背景
+                return (
+                  <div onClick={()=>{setSelPlanId(nextPlan.id);setActiveTab("計画");}} style={{background:"#fff",borderRadius:12,border:"1px solid #eee",padding:"16px 18px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+                    <div><p style={{margin:"0 0 3px",fontSize:11,color:"#aaa"}}>次のデート</p><p style={{margin:"0 0 2px",fontSize:15,fontWeight:700,color:"#222"}}>{nextPlan.title}</p><p style={{margin:0,fontSize:12,color:"#888"}}>{dateLabel}</p></div>
+                    <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:44,fontWeight:700,color:"#222",lineHeight:1}}>{diff}</p><p style={{margin:"2px 0 0",fontSize:13,color:"#888"}}>日後</p></div>
+                  </div>
+                );
+              } else if(diff>0) {
+                // 通常：薄緑背景
+                return (
+                  <div onClick={()=>{setSelPlanId(nextPlan.id);setActiveTab("計画");}} style={{background:"#e8f5f0",borderRadius:12,padding:"16px 18px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+                    <div><p style={{margin:"0 0 3px",fontSize:11,color:GREEN,opacity:0.8}}>次のデート</p><p style={{margin:"0 0 2px",fontSize:15,fontWeight:700,color:GREEN}}>{nextPlan.title}</p><p style={{margin:0,fontSize:12,color:GREEN,opacity:0.75}}>{dateLabel}</p></div>
+                    <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:44,fontWeight:700,color:GREEN,lineHeight:1}}>{diff}</p><p style={{margin:"2px 0 0",fontSize:13,color:GREEN}}>日後</p></div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {yearlySummary.length>0&&<p style={{fontWeight:700,marginBottom:10,fontSize:14}}>年別サマリー</p>}
             {yearlySummary.map(([y,d])=>(
               <div key={y} style={{...CS,padding:"0.75rem 1rem",marginBottom:8}}>
@@ -882,11 +989,9 @@ export default function App() {
             <div style={CS}>
               {(()=>{
                 const schedule = selPlan.schedule||[];
-                // dayOffsetでグループ化
                 const days = [...new Set(schedule.map(s=>s.dayOffset??0))].sort((a,b)=>a-b);
                 return days.map(dayOff => {
                   const dayRows = schedule.filter(s=>(s.dayOffset??0)===dayOff);
-                  // 日付ラベル生成
                   let dayLabel = `${dayOff+1}日目`;
                   if (selPlan.date) {
                     const d = new Date(selPlan.date);
@@ -897,11 +1002,52 @@ export default function App() {
                     <div key={dayOff} style={{marginBottom:dayOff<days[days.length-1]?12:0}}>
                       {days.length>1&&<p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:GREEN,background:"#e8f5f0",padding:"4px 10px",borderRadius:6,display:"inline-block"}}>{dayLabel}</p>}
                       {dayRows.map((s,i)=>{
-                        const trans=isTransport(s.cat), ret=isReturn(s.cat);
+                        const isTrans=isTransportCatSched(s.cat);
+                        const isMove=isMoveCat(s.cat);
                         const isLast = i===dayRows.length-1 && dayOff===days[days.length-1];
                         return (
                           <div key={s.id||i} style={{padding:"8px 0",borderBottom:!isLast?"1px solid #f0f0f0":"none"}}>
-                            {!trans&&(
+                            {/* 行き・帰り */}
+                            {isTrans&&(
+                              <div>
+                                <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}{s.content?" "+s.content:""}</p>
+                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                                  {[["natsuki","Nk"],["akira","Ak"]].map(([who,label])=>{
+                                    const d=s[who]||{};
+                                    const hasData=d.depTime||d.depPlace||d.arrTime||d.arrPlace||d.budget;
+                                    return (
+                                      <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
+                                        <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
+                                        {hasData?(<>
+                                          {(d.depTime||d.depPlace)&&<p style={{margin:"0 0 2px",fontSize:13}}>{d.depTime||"--:--"} {d.depPlace}</p>}
+                                          {(d.depTime||d.depPlace)&&(d.arrTime||d.arrPlace)&&<p style={{margin:"0 0 2px",fontSize:11,color:"#bbb"}}>↓</p>}
+                                          {(d.arrTime||d.arrPlace)&&<p style={{margin:"0 0 2px",fontSize:13}}>{d.arrTime||"--:--"} {d.arrPlace}</p>}
+                                          {d.budget&&<p style={{margin:"3px 0 0",fontSize:12,color:GREEN,fontWeight:700}}>{fmt(d.budget)}</p>}
+                                        </>):<p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            {/* 移動 */}
+                            {isMove&&(
+                              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                                <span style={{fontSize:13,color:"#888",fontWeight:500,minWidth:44,flexShrink:0}}>{s.depTime||"--:--"}</span>
+                                <div style={{flex:1}}>
+                                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                                    <span style={{fontSize:14,fontWeight:500}}>{s.depPlace}{(s.depPlace&&s.arrPlace)?" → ":""}{s.arrPlace}</span>
+                                  </div>
+                                  <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
+                                    <span style={{fontSize:11,color:"#888"}}>{s.cat}{s.moveMethod?" · "+s.moveMethod:""}</span>
+                                    {s.arrTime&&<span style={{fontSize:11,color:"#888"}}>到着 {s.arrTime}</span>}
+                                    {s.content&&<span style={{fontSize:11,color:"#888"}}>{s.content}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {/* 通常 */}
+                            {!isTrans&&!isMove&&(
                               <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                                 <span style={{fontSize:13,color:"#888",fontWeight:500,minWidth:44,flexShrink:0}}>{s.time||"--:--"}</span>
                                 <div style={{flex:1}}>
@@ -910,28 +1056,12 @@ export default function App() {
                                     {s.budget&&<span style={{fontSize:13,color:GREEN,fontWeight:700}}>{fmt(s.budget)}</span>}
                                   </div>
                                   <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
-                                    <span style={{fontSize:11,color:"#888"}}>{s.cat}</span>
+                                    <span style={{fontSize:11,color:"#888"}}>{catDisplay(s.cat)}</span>
                                     {(s.place||s.lat)&&(
                                       <a href={s.lat?`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.place)}`} target="_blank" rel="noreferrer"
                                         style={{fontSize:11,color:GREEN,textDecoration:"none"}}>{s.place||"地図"} →Gマップ</a>
                                     )}
                                   </div>
-                                </div>
-                              </div>
-                            )}
-                            {trans&&(
-                              <div>
-                                <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}　{s.content}</p>
-                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                                  {[["natsuki","Natsuki"],["akira","Akira"]].map(([who,label])=>{
-                                    const d=s[who]||{}, hasData=d.time||d.from||d.budget;
-                                    return (
-                                      <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
-                                        <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
-                                        {hasData?(<>{d.time&&<p style={{margin:"0 0 2px",fontSize:13}}>{d.time}</p>}{d.from&&<p style={{margin:"0 0 2px",fontSize:12,color:"#555"}}>{ret?"目的地":"出発地"}: {d.from}</p>}{d.budget&&<p style={{margin:0,fontSize:12,color:GREEN,fontWeight:700}}>{fmt(d.budget)}</p>}</>):<p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
-                                      </div>
-                                    );
-                                  })}
                                 </div>
                               </div>
                             )}
@@ -946,6 +1076,57 @@ export default function App() {
                 <span>予算合計</span><span style={{color:GREEN}}>{fmt(budgetOf(selPlan.schedule||[]))}</span>
               </div>
             </div>
+
+            {/* 持ち物リスト */}
+            {(()=>{
+              const checks = selPlan.checks||{};
+              const hasAny = ["Nk","Ak"].some(u=>(checks[u]||[]).some(c=>c.text));
+              if(!hasAny) return null;
+              return (
+                <>
+                  <p style={{fontWeight:700,fontSize:14,margin:"12px 0 8px"}}>持ち物リスト</p>
+                  {["Nk","Ak"].map(user=>{
+                    const items=(checks[user]||[]).filter(c=>c.text);
+                    if(!items.length) return null;
+                    const isMe = user===currentUserName;
+                    return (
+                      <div key={user} style={{...CS,marginBottom:8}}>
+                        <p style={{fontSize:13,fontWeight:700,color:USER_COLORS[user],marginBottom:8}}>{user}</p>
+                        {items.map(item=>(
+                          <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid #f5f5f5"}}>
+                            <div onClick={()=>{
+                              if(!isMe) return;
+                              const updated={...selPlan.checks,[user]:selPlan.checks[user].map(c=>c.id===item.id?{...c,checked:!c.checked}:c)};
+                              updateDoc(doc(db,"plans",selPlan.id),{checks:updated});
+                              setPlans(p=>p.map(pl=>pl.id===selPlan.id?{...pl,checks:updated}:pl));
+                            }} style={{width:20,height:20,borderRadius:5,border:`1.5px solid ${item.checked?USER_COLORS[user]:"#ddd"}`,background:item.checked?USER_COLORS[user]:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:isMe?"pointer":"default",opacity:isMe?1:0.5}}>
+                              {item.checked&&<svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4L4 7.5L10 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                            <span style={{fontSize:14,color:item.checked?"#bbb":"#222",textDecoration:item.checked?"line-through":"none",flex:1}}>{item.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+
+            {/* 参照URL */}
+            {(selPlan.links||[]).some(l=>l.url)&&(
+              <>
+                <p style={{fontWeight:700,fontSize:14,margin:"12px 0 8px"}}>参照URL</p>
+                <div style={CS}>
+                  {(selPlan.links||[]).filter(l=>l.url).map((link,i,arr)=>(
+                    <div key={link.id||i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<arr.length-1?"1px solid #f5f5f5":"none"}}>
+                      {link.label&&<span style={{fontSize:13,fontWeight:600,color:"#555",minWidth:52,flexShrink:0}}>{link.label}</span>}
+                      <a href={link.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:GREEN,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.url}</a>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div style={{display:"flex",gap:10,marginTop:"1rem",flexWrap:"wrap"}}>
               <button onClick={()=>openEditPlan(selPlan)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",color:"#555",fontWeight:700,fontSize:14,cursor:"pointer"}}>編集する</button>
               {selPlan.status==="計画中"&&<button onClick={()=>markDone(selPlan.id)} style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${GREEN}`,background:"#fff",color:GREEN,fontWeight:700,fontSize:14,cursor:"pointer"}}>実行済みにする</button>}
@@ -979,9 +1160,13 @@ export default function App() {
             <div style={CS}>
               {monthlySummary.map(([ym,t],i)=>{
                 const [y,m]=ym.split("-"), max=Math.max(...monthlySummary.map(([,v])=>v));
+                const monthDates = filtered.filter(d=>getYM(d.date)===ym);
+                const nkT = monthDates.reduce((s,d)=>s+paidByUser(d.items||[],"Nk"),0);
+                const akT = monthDates.reduce((s,d)=>s+paidByUser(d.items||[],"Ak"),0);
                 return (
                   <div key={ym} style={{padding:"7px 0",borderBottom:i<monthlySummary.length-1?"1px solid #f0f0f0":"none"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:13}}><span>{y}年{m}月</span><span style={{fontWeight:700}}>{fmt(t)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}><span>{y}年{m}月</span><span style={{fontWeight:700}}>{fmt(t)}</span></div>
+                    <div style={{display:"flex",gap:10,marginBottom:4}}>{nkT>0&&<span style={{fontSize:11,color:USER_COLORS.Nk}}>Nk: {fmt(nkT)}</span>}{akT>0&&<span style={{fontSize:11,color:USER_COLORS.Ak}}>Ak: {fmt(akT)}</span>}</div>
                     <div style={{height:5,background:"#f0f0f0",borderRadius:3}}><div style={{height:"100%",width:`${Math.round(t/max*100)}%`,background:GREEN,borderRadius:3}}/></div>
                   </div>
                 );
@@ -1001,25 +1186,35 @@ export default function App() {
             </div>
             {catSummary.length>0&&(
               <div style={{...CS,marginBottom:10}}>
-                {/* 交通費合計行（すべて表示時 or 交通費フィルター時） */}
+                {/* 交通費合算行（すべて or 交通費フィルター時） */}
                 {(filterCat==="すべて"||filterCat==="交通費")&&(()=>{
                   const transportTotal = catSummary.filter(([cat])=>isTransportCat(cat)).reduce((s,[,t])=>s+t,0);
                   if(!transportTotal) return null;
                   return (
                     <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0f0f0",fontSize:13}}>
-                      <span style={{fontWeight:700,color:"#333"}}>交通費合計</span>
+                      <span style={{fontWeight:700,color:"#333"}}>交通費</span>
                       <span style={{fontWeight:700,color:"#333"}}>{fmt(transportTotal)}</span>
                     </div>
                   );
                 })()}
-                {catSummary.map(([cat,t],i)=>(
+                {/* 交通費以外のカテゴリ（すべて表示時） */}
+                {filterCat==="すべて"&&catSummary.filter(([cat])=>!isTransportCat(cat)).map(([cat,t],i,arr)=>(
+                  <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<arr.length-1?"1px solid #f0f0f0":"none",fontSize:13}}>
+                    <span style={{color:"#555"}}>{cat}</span>
+                    <span style={{fontWeight:700,color:"#333"}}>{fmt(t)}</span>
+                  </div>
+                ))}
+                {/* 交通費フィルター時：合算のみ */}
+                {filterCat==="交通費"&&null}
+                {/* 個別カテゴリフィルター時 */}
+                {filterCat!=="すべて"&&filterCat!=="交通費"&&catSummary.map(([cat,t],i)=>(
                   <div key={cat} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:i<catSummary.length-1?"1px solid #f0f0f0":"none",fontSize:13}}>
-                    <span style={{color:"#555",paddingLeft:isTransportCat(cat)?16:0}}>{cat}</span>
-                    <span style={{fontWeight:isTransportCat(cat)?400:700,color:isTransportCat(cat)?"#888":"#333"}}>{fmt(t)}</span>
+                    <span style={{color:"#555"}}>{cat}</span>
+                    <span style={{fontWeight:700,color:"#333"}}>{fmt(t)}</span>
                   </div>
                 ))}
                 <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0 0",marginTop:4,borderTop:"2px solid #eee",fontWeight:700,fontSize:14}}>
-                  <span>{filterCat==="すべて"?"合計":filterCat+"合計"}</span><span style={{color:GREEN}}>{fmt(catFilteredTotal)}</span>
+                  <span>{filterCat==="すべて"?"合計":filterCat==="交通費"?"交通費合計":filterCat+"合計"}</span><span style={{color:GREEN}}>{fmt(catFilteredTotal)}</span>
                 </div>
               </div>
             )}
@@ -1111,6 +1306,41 @@ export default function App() {
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
               <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched} baseDate={npDate}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>予算合計: {fmt(budgetOf(npSched))}</div>
+
+              {/* 持ち物リスト */}
+              <p style={{fontWeight:700,fontSize:14,margin:"14px 0 8px"}}>持ち物リスト</p>
+              {["Nk","Ak"].map(user=>(
+                <div key={user} style={{background:"#f9f9f9",borderRadius:10,border:"1px solid #eee",padding:"10px 12px",marginBottom:8}}>
+                  <p style={{fontSize:13,fontWeight:700,color:USER_COLORS[user],marginBottom:8}}>{user}</p>
+                  {(npChecks[user]||[]).map(item=>(
+                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                      <button onClick={()=>setNpChecks(p=>({...p,[user]:p[user].filter(c=>c.id!==item.id)}))}
+                        style={{background:"none",border:"none",color:"#ccc",fontSize:18,cursor:"pointer",padding:0,flexShrink:0,lineHeight:1}}>×</button>
+                      <input value={item.text} onChange={e=>setNpChecks(p=>({...p,[user]:p[user].map(c=>c.id===item.id?{...c,text:e.target.value}:c)}))}
+                        placeholder="持ち物を入力" style={{...SI,flex:1,minWidth:0}}/>
+                    </div>
+                  ))}
+                  <button onClick={()=>setNpChecks(p=>({...p,[user]:[...p[user],makeCheckItem(Date.now())]}))}
+                    style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",color:"#888",marginTop:2}}>+ 追加</button>
+                </div>
+              ))}
+
+              {/* 参照URL */}
+              <p style={{fontWeight:700,fontSize:14,margin:"14px 0 8px"}}>参照URL</p>
+              <div style={{background:"#f9f9f9",borderRadius:10,border:"1px solid #eee",padding:"10px 12px",marginBottom:8}}>
+                {npLinks.map(link=>(
+                  <div key={link.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:5}}>
+                    <input value={link.label} onChange={e=>setNpLinks(p=>p.map(l=>l.id===link.id?{...l,label:e.target.value}:l))}
+                      placeholder="ラベル" style={{...SI,width:72,flexShrink:0}}/>
+                    <input value={link.url} onChange={e=>setNpLinks(p=>p.map(l=>l.id===link.id?{...l,url:e.target.value}:l))}
+                      placeholder="https://..." style={{...SI,flex:1,minWidth:0}}/>
+                    <button onClick={()=>setNpLinks(p=>p.filter(l=>l.id!==link.id))}
+                      style={{background:"none",border:"none",color:"#ccc",fontSize:18,cursor:"pointer",padding:0,flexShrink:0,lineHeight:1}}>×</button>
+                  </div>
+                ))}
+                <button onClick={()=>setNpLinks(p=>[...p,makeLink(Date.now())])}
+                  style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",color:"#888",marginTop:2}}>+ URLを追加</button>
+              </div>
             </div>
             <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>{setShowAddPlan(false);setEditPlanId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
