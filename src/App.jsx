@@ -761,7 +761,7 @@ export default function App() {
 
       {loading && <div style={{padding:"2rem",textAlign:"center",color:"#aaa",fontSize:14}}>データを読み込み中...</div>}
 
-      <div style={{flex:1,overflowY:"auto",paddingBottom:40}}>
+      <div style={{flex:1,overflowY:"auto",paddingBottom:80}}>
 
         {/* HOME */}
         {activeTab==="ホーム"&&!loading&&(
@@ -1252,7 +1252,7 @@ export default function App() {
                 <div style={{flexShrink:0,width:120}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>日付 *</label><input type="date" value={ndDate} onChange={e=>setNdDate(e.target.value)} style={{...INP,fontSize:13,padding:"9px 6px"}}/></div>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem 80px",width:"100%",boxSizing:"border-box"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ</label><textarea value={ndMemo} onChange={e=>setNdMemo(e.target.value)} placeholder="思い出メモ..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <div style={{marginBottom:14}}>
                 <p style={{margin:"0 0 6px",fontWeight:700,fontSize:14}}>訪れた場所</p>
@@ -1301,7 +1301,7 @@ export default function App() {
                 <div style={{flexShrink:0,width:120}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>予定日 *</label><input type="date" value={npDate} onChange={e=>setNpDate(e.target.value)} style={{...INP,fontSize:13,padding:"9px 6px"}}/></div>
               </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem 80px",width:"100%",boxSizing:"border-box"}}>
               <div style={{marginBottom:14}}><label style={{fontSize:12,color:"#888",display:"block",marginBottom:3}}>メモ・アイデア</label><textarea value={npMemo} onChange={e=>setNpMemo(e.target.value)} placeholder="行きたいお店やアイデアなど..." style={{...INP,minHeight:56,resize:"vertical"}}/></div>
               <p style={{fontWeight:700,fontSize:14,marginBottom:4}}>タイムスケジュール</p>
               <ScheduleEditor rows={npSched} onUpdate={npUpdSched} onAdd={()=>setNpSched(p=>[...p,makeSched(Date.now())])} onRemove={id=>setNpSched(p=>p.length>1?p.filter(r=>r.id!==id):p)} onMove={npMoveSched} onGeocode={npGeoSched} baseDate={npDate}/>
@@ -1358,7 +1358,7 @@ export default function App() {
               <p style={{margin:"0 0 4px",fontWeight:700,fontSize:16}}>費用を一括入力</p>
               <p style={{margin:0,fontSize:12,color:"#888"}}>金額を入力した行だけ追加されます</p>
             </div>
-            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem",width:"100%",boxSizing:"border-box"}}>
+            <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"1rem 1.25rem 80px",width:"100%",boxSizing:"border-box"}}>
               <RowEditor rows={bulkRows} onUpdate={bkUpd} onAdd={()=>setBulkRows(p=>[...p,makeRow(Date.now())])} onRemove={id=>setBulkRows(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700,color:GREEN,margin:"10px 0 8px",paddingTop:10,borderTop:"2px solid #eee"}}><span>合計</span><span>{fmt(totalOf(bulkRows))}</span></div>
             </div>
