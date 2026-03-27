@@ -1282,7 +1282,7 @@ export default function App() {
               <RowEditor rows={ndItems} onUpdate={ndUpdRow} onAdd={(paidBy)=>setNdItems(p=>[...p,{...makeRow(Date.now()),paidBy}])} onRemove={id=>setNdItems(p=>p.length>1?p.filter(r=>r.id!==id):p)} defaultPaidBy={currentUserName}/>
               <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>合計: {fmt(totalOf([...ndItems,...partnerItems]))}</div>
             </div>
-            <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
+            <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>{setShowAddDate(false);setEditDateId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
               <button onClick={saveDate} disabled={saving} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>{saving?"保存中...":(editDateId?"更新":"保存")}</button>
             </div>
@@ -1342,7 +1342,7 @@ export default function App() {
                   style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer",color:"#888",marginTop:2}}>+ URLを追加</button>
               </div>
             </div>
-            <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
+            <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>{setShowAddPlan(false);setEditPlanId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
               <button onClick={savePlan} disabled={saving} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>{saving?"保存中...":(editPlanId?"更新":"保存")}</button>
             </div>
@@ -1362,7 +1362,7 @@ export default function App() {
               <RowEditor rows={bulkRows} onUpdate={bkUpd} onAdd={()=>setBulkRows(p=>[...p,makeRow(Date.now())])} onRemove={id=>setBulkRows(p=>p.length>1?p.filter(r=>r.id!==id):p)}/>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:700,color:GREEN,margin:"10px 0 8px",paddingTop:10,borderTop:"2px solid #eee"}}><span>合計</span><span>{fmt(totalOf(bulkRows))}</span></div>
             </div>
-            <div style={{padding:"0.75rem 1.25rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
+            <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>setShowBulk(false)} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
               <button onClick={saveBulk} disabled={saving} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>{saving?"追加中...":"追加する"}</button>
             </div>
