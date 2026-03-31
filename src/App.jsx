@@ -527,7 +527,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    setDates([]); setPlans([]);
+    setDates([]); setPlans([]); setFutureSpots([]);
     setActiveTab("ホーム");
   };
 
@@ -538,9 +538,11 @@ export default function App() {
     Promise.all([
       getDocs(query(collection(db, "dates"), orderBy("date","desc"))),
       getDocs(query(collection(db, "plans"), orderBy("date","asc"))),
-    ]).then(([dateSnap, planSnap]) => {
+      getDocs(collection(db, "futureSpots")),
+    ]).then(([dateSnap, planSnap, futureSnap]) => {
       setDates(dateSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       setPlans(planSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+      setFutureSpots(futureSnap.docs.map(d => ({ ...d.data(), id: d.id })));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
@@ -1381,6 +1383,11 @@ export default function App() {
             <button onClick={()=>{setEditFutureId(null);setFsName("");setFsMemo("");setFsAddr("");setFsLat("");setFsLng("");setShowAddFuture(true);}}
               style={{fontSize:13,padding:"4px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>+ 追加</button>
           </div>
+          {futureSpots.length>0&&(
+            <div style={{marginBottom:12}}>
+              <SpotMap spots={futureSpots.filter(f=>f.lat&&f.name).map(f=>({id:f.id,name:f.name,address:f.address||"",lat:f.lat,lng:f.lng}))}/>
+            </div>
+          )}
           {futureSpots.length===0&&<p style={{color:"#aaa",fontSize:14,textAlign:"center",marginTop:40}}>まだリストがありません</p>}
           {futureSpots.map(fs=>(
             <div key={fs.id} style={{...CS,cursor:"pointer"}} onClick={()=>{setEditFutureId(fs.id);setFsName(fs.name);setFsMemo(fs.memo||"");setFsAddr(fs.address||"");setFsLat(fs.lat||"");setFsLng(fs.lng||"");setShowAddFuture(true);}}>
@@ -1390,12 +1397,8 @@ export default function App() {
                   {fs.memo&&<p style={{margin:"0 0 4px",fontSize:13,color:"#888"}}>{fs.memo}</p>}
                   {fs.lat&&<p style={{margin:0,fontSize:11,color:GREEN}}>位置情報あり</p>}
                 </div>
-                <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,marginLeft:8}}>
-                  {fs.lat&&<a href={`https://www.google.com/maps/search/?api=1&query=${fs.lat},${fs.lng}`} target="_blank" rel="noreferrer"
-                    onClick={e=>e.stopPropagation()} style={{fontSize:12,color:GREEN,textDecoration:"none"}}>Gマップ</a>}
-                  <button onClick={e=>{e.stopPropagation();if(!window.confirm("削除しますか？"))return;setFutureSpots(p=>p.filter(f=>f.id!==fs.id));}}
-                    style={{background:"none",border:"none",color:"#ccc",fontSize:18,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
-                </div>
+                {fs.lat&&<a href={`https://www.google.com/maps/search/?api=1&query=${fs.lat},${fs.lng}`} target="_blank" rel="noreferrer"
+                  onClick={e=>e.stopPropagation()} style={{fontSize:12,color:GREEN,textDecoration:"none",flexShrink:0,marginLeft:8}}>Gマップ</a>}
               </div>
             </div>
           ))}
@@ -1612,13 +1615,20 @@ export default function App() {
             </div>
             <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
               <button onClick={()=>{setShowAddFuture(false);setEditFutureId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
-              {editFutureId&&<button onClick={()=>{if(!window.confirm("削除しますか？"))return;setFutureSpots(p=>p.filter(f=>f.id!==editFutureId));setShowAddFuture(false);setEditFutureId(null);}}
+              {editFutureId&&<button onClick={async()=>{if(!window.confirm("削除しますか？"))return;try{await deleteDoc(doc(db,"futureSpots",editFutureId));setFutureSpots(p=>p.filter(f=>f.id!==editFutureId));}catch(e){alert("削除に失敗しました");}setShowAddFuture(false);setEditFutureId(null);}}
                 style={{padding:"12px 16px",borderRadius:10,border:"1px solid #ffcccc",background:"#fff8f8",color:"#E24B4A",fontWeight:700,cursor:"pointer"}}>削除</button>}
-              <button onClick={()=>{
+              <button onClick={async()=>{
                 if(!fsName)return;
-                const spot={id:editFutureId||Date.now(),name:fsName,memo:fsMemo,address:fsAddr,lat:fsLat,lng:fsLng};
-                if(editFutureId) setFutureSpots(p=>p.map(f=>f.id===editFutureId?spot:f));
-                else setFutureSpots(p=>[...p,spot]);
+                const data={name:fsName,memo:fsMemo,address:fsAddr,lat:fsLat,lng:fsLng};
+                try{
+                  if(editFutureId){
+                    await updateDoc(doc(db,"futureSpots",editFutureId),data);
+                    setFutureSpots(p=>p.map(f=>f.id===editFutureId?{...data,id:editFutureId}:f));
+                  } else {
+                    const ref=await addDoc(collection(db,"futureSpots"),data);
+                    setFutureSpots(p=>[...p,{...data,id:ref.id}]);
+                  }
+                }catch(e){alert("保存に失敗しました: "+e.message);}
                 setShowAddFuture(false);setEditFutureId(null);
               }} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer"}}>
                 {editFutureId?"更新":"追加"}
