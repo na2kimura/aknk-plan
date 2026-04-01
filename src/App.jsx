@@ -78,6 +78,8 @@ const makeSched = (id) => ({
   // 行き・帰り：複数ルート対応
   nkRoutes: [makeRoute("nk-1")],
   akRoutes: [makeRoute("ak-1")],
+  nkBudget: "",
+  akBudget: "",
 });
 const makeRoute = (id) => ({
   id,
@@ -95,7 +97,7 @@ const makeFutureSpot = (id) => ({ id, name: "", memo: "", address: "", lat: "", 
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransportCatSched(r.cat) ? s + routesBudget(r) : s + (Number(r.budget)||0), 0);
-const routesBudget = (r) => Number(r.budget)||0;
+const routesBudget = (r) => (Number(r.nkBudget)||0) + (Number(r.akBudget)||0);
 const paidByUser = (items, u) => items.filter(i => toDisplayUser(i.paidBy) === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
@@ -362,7 +364,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, on
 
 
 // ── TransportPersonBlock（ScheduleEditorの外に定義・リマウント防止）──
-function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREEN, MOVE_METHODS }) {
+function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, onUpdateBudget, SI, GREEN, MOVE_METHODS }) {
   const routes = row[`${who}Routes`] || [makeRoute(`${who}-1`)];
   const updateRoute = (routeId, field, val) => {
     onUpdateRoutes(routes.map(r => r.id === routeId ? {...r, [field]: val} : r));
@@ -433,6 +435,11 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
         style={{width:"100%",padding:"6px",borderRadius:7,border:"1px dashed #ddd",background:"transparent",cursor:"pointer",fontSize:12,color:"#888",marginTop:8}}>
         + 乗り換えを追加
       </button>
+      <div style={{display:"flex",alignItems:"center",gap:3,marginTop:8}}>
+        <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
+        <input type="number" value={row[`${who}Budget`]||""} onChange={e=>onUpdateBudget(e.target.value)}
+          placeholder="0" style={{...SI,flex:1,textAlign:"right",boxSizing:"border-box"}}/>
+      </div>
     </div>
   );
 }
@@ -479,13 +486,8 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
             {/* ★ 行き・帰り：Nk/Ak 縦並び */}
             {isTrans && (
               <div style={{display:"flex",flexDirection:"column",gap:0,width:"100%",boxSizing:"border-box"}}>
-                <TransportPersonBlock key={row.id+"-nk"} row={row} who="nk" label="Nk" color={USER_COLORS.Nk} onUpdateRoutes={(routes)=>onUpdate(row.id,"nkRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
-                <TransportPersonBlock key={row.id+"-ak"} row={row} who="ak" label="Ak" color={USER_COLORS.Ak} onUpdateRoutes={(routes)=>onUpdate(row.id,"akRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
-                <div style={{display:"flex",alignItems:"center",gap:3,marginTop:6}}>
-                  <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                  <input type="number" value={row.budget||""} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
-                    placeholder="0" style={{...SI,flex:1,textAlign:"right",boxSizing:"border-box"}}/>
-                </div>
+                <TransportPersonBlock key={row.id+"-nk"} row={row} who="nk" label="Nk" color={USER_COLORS.Nk} onUpdateRoutes={(routes)=>onUpdate(row.id,"nkRoutes",routes)} onUpdateBudget={(val)=>onUpdate(row.id,"nkBudget",val)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
+                <TransportPersonBlock key={row.id+"-ak"} row={row} who="ak" label="Ak" color={USER_COLORS.Ak} onUpdateRoutes={(routes)=>onUpdate(row.id,"akRoutes",routes)} onUpdateBudget={(val)=>onUpdate(row.id,"akBudget",val)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
               </div>
             )}
 
