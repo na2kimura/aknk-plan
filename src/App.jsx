@@ -95,7 +95,7 @@ const makeFutureSpot = (id) => ({ id, name: "", memo: "", address: "", lat: "", 
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransportCatSched(r.cat) ? s + routesBudget(r) : s + (Number(r.budget)||0), 0);
-const routesBudget = (r) => 0; // 行き帰りに予算フィールドは現状なし
+const routesBudget = (r) => Number(r.budget)||0;
 const paidByUser = (items, u) => items.filter(i => toDisplayUser(i.paidBy) === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
@@ -422,8 +422,10 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
             {timeSelects(route.arrTime||"", v=>updateRoute(route.id,"arrTime",v))}
-            <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
-              placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
+            {ri === routes.length - 1 && (
+              <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
+                placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
+            )}
           </div>
         </div>
       ))}
@@ -479,6 +481,11 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
               <div style={{display:"flex",flexDirection:"column",gap:0,width:"100%",boxSizing:"border-box"}}>
                 <TransportPersonBlock key={row.id+"-nk"} row={row} who="nk" label="Nk" color={USER_COLORS.Nk} onUpdateRoutes={(routes)=>onUpdate(row.id,"nkRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
                 <TransportPersonBlock key={row.id+"-ak"} row={row} who="ak" label="Ak" color={USER_COLORS.Ak} onUpdateRoutes={(routes)=>onUpdate(row.id,"akRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
+                <div style={{display:"flex",alignItems:"center",gap:3,marginTop:6}}>
+                  <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
+                  <input type="number" value={row.budget||""} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
+                    placeholder="0" style={{...SI,flex:1,textAlign:"right",boxSizing:"border-box"}}/>
+                </div>
               </div>
             )}
 
@@ -545,14 +552,11 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
               <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   {timeSelects(row.time||"", v=>onUpdate(row.id,"time",v), false)}
-                  {/* 自由記述は予算なし */}
-                  {row.cat !== "自由記述" && (
-                    <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
-                      <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                      <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
-                        placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
-                    </div>
-                  )}
+                  <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
+                    <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
+                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
+                      placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
+                  </div>
                 </div>
                 {/* 自由記述：内容(content)・補足(place)・場所名・住所・地図取得 */}
                 {row.cat === "自由記述" && (
@@ -641,9 +645,12 @@ export default function App() {
   const [fsLat,   setFsLat]   = useState("");
   const [fsLng,   setFsLng]   = useState("");
   const [fsSearching, setFsSearching] = useState(false);
+  const [fsUrl,       setFsUrl]       = useState("");
+  const [fsChecked,   setFsChecked]   = useState(false);
 
   const [budgets, setBudgets] = useState({});
   const [editBudgetYear, setEditBudgetYear] = useState(null);
+  const [localBudgetEdit, setLocalBudgetEdit] = useState({});
   const [bulkRows, setBulkRows] = useState(Array.from({length:5},(_,i)=>makeRow(i+1)));
 
   useEffect(() => {
@@ -963,7 +970,7 @@ export default function App() {
         </div>
         <div style={{display:"flex"}}>
           {TABS.map(t=>(
-            <button key={t} onClick={()=>{setActiveTab(t);setSelDateId(null);setSelPlanId(null);}} style={{flex:1,padding:"9px 4px",fontSize:13,fontWeight:activeTab===t?700:500,border:"none",background:activeTab===t?"#f0faf6":"transparent",borderBottom:activeTab===t?`2px solid ${GREEN}`:"2px solid transparent",color:activeTab===t?GREEN:"#555",cursor:"pointer"}}>{t}</button>
+            <button key={t} onClick={()=>{setActiveTab(t);setSelDateId(null);setSelPlanId(null);}} style={{flex:1,padding:"9px 4px",fontSize:13,fontWeight:activeTab===t?700:600,border:"none",background:activeTab===t?"#f0faf6":"transparent",borderBottom:activeTab===t?`2px solid ${GREEN}`:"2px solid transparent",color:activeTab===t?GREEN:"#444",cursor:"pointer"}}>{t}</button>
           ))}
         </div>
       </div>
@@ -1197,7 +1204,7 @@ export default function App() {
                 <>
                   <div style={{display:"flex",gap:0,background:"#fff",borderRadius:10,border:"1px solid #eee",marginBottom:10,overflow:"hidden"}}>
                     {["スケジュール","持ち物","参照URL","買い物"].map(t=>(
-                      <button key={t} onClick={()=>setDetailTab(t)} style={{flex:1,padding:"8px 2px",fontSize:11,fontWeight:detailTab===t?700:400,border:"none",borderBottom:detailTab===t?`2px solid ${GREEN}`:"2px solid transparent",background:detailTab===t?"#f0faf6":"transparent",color:detailTab===t?GREEN:"#aaa",cursor:"pointer"}}>
+                      <button key={t} onClick={()=>setDetailTab(t)} style={{flex:1,padding:"8px 2px",fontSize:11,fontWeight:detailTab===t?700:500,border:"none",borderBottom:detailTab===t?`2px solid ${GREEN}`:"2px solid transparent",background:detailTab===t?"#f0faf6":"transparent",color:detailTab===t?GREEN:"#555",cursor:"pointer"}}>
                         {t}
                       </button>
                     ))}
@@ -1411,19 +1418,23 @@ export default function App() {
                 const yearlyBudget = (nkB+akB)*12;
                 const yearActual = dates.filter(d=>getY(d.date)===ys).reduce((s,d)=>s+totalOf(d.items||[]),0);
                 const yearPlanned = plans.filter(p=>p.status==="計画中"&&getY(p.date||"")===ys).reduce((s,p)=>s+budgetOf(p.schedule||[]),0);
-                const saveBudget = async (field,val)=>{
-                  const newYearBudget={...budgets[ys],[field]:Number(val)||0};
+                const saveBudget = (field,val)=>{
+                  setLocalBudgetEdit(p=>({...p,[field]:val}));
+                };
+                const flushBudget = async ()=>{
+                  const newYearBudget={...budgets[ys],Nk:Number(localBudgetEdit.Nk??budgets[ys]?.Nk)??0,Ak:Number(localBudgetEdit.Ak??budgets[ys]?.Ak)??0};
                   setBudgets(b=>({...b,[ys]:newYearBudget}));
-                  try{ await setDoc(doc(db,"budgets",ys), newYearBudget); }
+                  try{ await setDoc(doc(db,"budgets",ys),newYearBudget); }
                   catch(e){ console.error("予算保存エラー",e); }
+                  setEditBudgetYear(null);
                 };
                 return (
                   <div key={ys} style={{...CS,marginBottom:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                       <span style={{fontWeight:700,fontSize:15}}>{ys}年</span>
                       {editBudgetYear===ys
-                        ?<button onClick={()=>setEditBudgetYear(null)} style={{fontSize:12,padding:"3px 12px",borderRadius:20,border:`1px solid ${GREEN}`,background:GREEN,color:"#fff",cursor:"pointer"}}>完了</button>
-                        :<button onClick={()=>setEditBudgetYear(ys)} style={{fontSize:12,padding:"3px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",color:"#888",cursor:"pointer"}}>月額予算を設定</button>
+                        ?<button onClick={flushBudget} style={{fontSize:12,padding:"3px 12px",borderRadius:20,border:`1px solid ${GREEN}`,background:GREEN,color:"#fff",cursor:"pointer"}}>完了</button>
+                        :<button onClick={()=>{setEditBudgetYear(ys);setLocalBudgetEdit({Nk:budgets[ys]?.Nk||"",Ak:budgets[ys]?.Ak||""});}} style={{fontSize:12,padding:"3px 12px",borderRadius:20,border:"1px solid #ddd",background:"transparent",color:"#888",cursor:"pointer"}}>月額予算を設定</button>
                       }
                     </div>
                     {editBudgetYear===ys&&(
@@ -1431,7 +1442,7 @@ export default function App() {
                         {["Nk","Ak"].map(u=>(
                           <div key={u} style={{flex:1,background:USER_COLORS[u]+"14",borderRadius:8,padding:"8px 10px"}}>
                             <p style={{margin:"0 0 4px",fontSize:11,color:USER_COLORS[u],fontWeight:700}}>{u} 月額 ¥</p>
-                            <input type="number" value={budgets[ys]?.[u]||""} onChange={e=>saveBudget(u,e.target.value)}
+                            <input type="number" value={localBudgetEdit[u]??""} onChange={e=>saveBudget(u,e.target.value)}
                               placeholder="0" style={{...SI,width:"100%",textAlign:"right"}}/>
                           </div>
                         ))}
@@ -1683,7 +1694,7 @@ export default function App() {
               </div>
               <div style={{display:"flex",gap:0,borderBottom:"1px solid #eee",marginBottom:-1}}>
                 {["スケジュール","持ち物","参照URL","買い物"].map(t=>(
-                  <button key={t} onClick={()=>setNpPlanTab(t)} style={{flex:1,padding:"7px 2px",fontSize:11,fontWeight:npPlanTab===t?700:400,border:"none",background:"transparent",borderBottom:npPlanTab===t?`2px solid ${GREEN}`:"2px solid transparent",color:npPlanTab===t?GREEN:"#aaa",cursor:"pointer"}}>
+                  <button key={t} onClick={()=>setNpPlanTab(t)} style={{flex:1,padding:"7px 2px",fontSize:11,fontWeight:npPlanTab===t?700:500,border:"none",background:"transparent",borderBottom:npPlanTab===t?`2px solid ${GREEN}`:"2px solid transparent",color:npPlanTab===t?GREEN:"#555",cursor:"pointer"}}>
                     {t}
                   </button>
                 ))}
