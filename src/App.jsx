@@ -78,8 +78,6 @@ const makeSched = (id) => ({
   // 行き・帰り：複数ルート対応
   nkRoutes: [makeRoute("nk-1")],
   akRoutes: [makeRoute("ak-1")],
-  nkBudget: "",
-  akBudget: "",
 });
 const makeRoute = (id) => ({
   id,
@@ -89,6 +87,7 @@ const makeRoute = (id) => ({
   arrPlace: "",
   moveMethod: "電車",
   moveMethodFree: "",
+  cost: "",
 });
 const makeCheckItem = (id) => ({ id, text: "", checked: false });
 const makeShopItem  = (id) => ({ id, text: "", checked: false });
@@ -97,7 +96,9 @@ const makeFutureSpot = (id) => ({ id, name: "", memo: "", address: "", lat: "", 
 
 const totalOf    = (items) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 const budgetOf   = (rows)  => rows.reduce((s, r) => isTransportCatSched(r.cat) ? s + routesBudget(r) : s + (Number(r.budget)||0), 0);
-const routesBudget = (r) => (Number(r.nkBudget)||0) + (Number(r.akBudget)||0);
+const routesBudget = (r) => routesCostSum(r.nkRoutes) + routesCostSum(r.akRoutes);
+const routesCostSum = (routes) => (routes||[]).reduce((s, rt) => s + (Number(rt.cost)||0), 0);
+const routesCostByPerson = (schedule, who) => (schedule||[]).filter(r => isTransportCatSched(r.cat)).reduce((s, r) => s + routesCostSum(r[`${who}Routes`]), 0);
 const paidByUser = (items, u) => items.filter(i => toDisplayUser(i.paidBy) === u).reduce((s, i) => s + (Number(i.amount)||0), 0);
 const fmt        = (n) => `¥${Number(n).toLocaleString()}`;
 const getYM      = (d) => d.slice(0, 7);
@@ -364,7 +365,7 @@ function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, on
 
 
 // ── TransportPersonBlock（ScheduleEditorの外に定義・リマウント防止）──
-function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, onUpdateBudget, SI, GREEN, MOVE_METHODS }) {
+function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREEN, MOVE_METHODS }) {
   const routes = row[`${who}Routes`] || [makeRoute(`${who}-1`)];
   const updateRoute = (routeId, field, val) => {
     onUpdateRoutes(routes.map(r => r.id === routeId ? {...r, [field]: val} : r));
@@ -429,17 +430,22 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, onUpdate
                 placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
             )}
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:3,marginTop:5,paddingLeft:4}}>
+            <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>金額 ¥</span>
+            <input key={route.id+"-cost"} type="number" defaultValue={route.cost||""} onBlur={e=>updateRoute(route.id,"cost",e.target.value)}
+              placeholder="0" style={{...SI,flex:1,textAlign:"right",boxSizing:"border-box",maxWidth:120}}/>
+          </div>
         </div>
       ))}
       <button onClick={addRoute}
         style={{width:"100%",padding:"6px",borderRadius:7,border:"1px dashed #ddd",background:"transparent",cursor:"pointer",fontSize:12,color:"#888",marginTop:8}}>
         + 乗り換えを追加
       </button>
-      <div style={{display:"flex",alignItems:"center",gap:3,marginTop:8}}>
-        <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-        <input type="number" value={row[`${who}Budget`]||""} onChange={e=>onUpdateBudget(e.target.value)}
-          placeholder="0" style={{...SI,flex:1,textAlign:"right",boxSizing:"border-box"}}/>
-      </div>
+      {routesCostSum(routes) > 0 && (
+        <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:3,marginTop:6}}>
+          <span style={{fontSize:12,fontWeight:700,color}}>小計: ¥{routesCostSum(routes).toLocaleString()}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -486,8 +492,8 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, onUpdate
             {/* ★ 行き・帰り：Nk/Ak 縦並び */}
             {isTrans && (
               <div style={{display:"flex",flexDirection:"column",gap:0,width:"100%",boxSizing:"border-box"}}>
-                <TransportPersonBlock key={row.id+"-nk"} row={row} who="nk" label="Nk" color={USER_COLORS.Nk} onUpdateRoutes={(routes)=>onUpdate(row.id,"nkRoutes",routes)} onUpdateBudget={(val)=>onUpdate(row.id,"nkBudget",val)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
-                <TransportPersonBlock key={row.id+"-ak"} row={row} who="ak" label="Ak" color={USER_COLORS.Ak} onUpdateRoutes={(routes)=>onUpdate(row.id,"akRoutes",routes)} onUpdateBudget={(val)=>onUpdate(row.id,"akBudget",val)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
+                <TransportPersonBlock key={row.id+"-nk"} row={row} who="nk" label="Nk" color={USER_COLORS.Nk} onUpdateRoutes={(routes)=>onUpdate(row.id,"nkRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
+                <TransportPersonBlock key={row.id+"-ak"} row={row} who="ak" label="Ak" color={USER_COLORS.Ak} onUpdateRoutes={(routes)=>onUpdate(row.id,"akRoutes",routes)} SI={SI} GREEN={GREEN} MOVE_METHODS={MOVE_METHODS}/>
               </div>
             )}
 
@@ -556,7 +562,7 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, onUpdate
                   {timeSelects(row.time||"", v=>onUpdate(row.id,"time",v), false)}
                   <div style={{display:"flex",alignItems:"center",gap:3,flex:1,minWidth:0}}>
                     <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>予算¥</span>
-                    <input type="number" value={row.budget} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
+                    <input type="number" value={row.budget||""} onChange={e=>onUpdate(row.id,"budget",e.target.value)}
                       placeholder="0" style={{...SI,flex:1,minWidth:0,textAlign:"right",boxSizing:"border-box"}}/>
                   </div>
                 </div>
@@ -1265,10 +1271,11 @@ export default function App() {
                                                   {hasData ? routes.map((route,ri)=>(
                                                     <div key={route.id||ri} style={{borderTop:ri>0?"1px dashed #eee":"none",paddingTop:ri>0?4:0,marginTop:ri>0?4:0}}>
                                                       {(route.depTime||route.depPlace)&&<p style={{margin:"0 0 1px",fontSize:12}}>{route.depTime||"--:--"} {route.depPlace}</p>}
-                                                      <p style={{margin:"0 0 1px",fontSize:11,color:"#bbb"}}>↓ {route.moveMethod==="自由記述"?route.moveMethodFree||"":route.moveMethod||""}</p>
+                                                      <p style={{margin:"0 0 1px",fontSize:11,color:"#bbb"}}>↓ {route.moveMethod==="自由記述"?route.moveMethodFree||"":route.moveMethod||""}{route.cost ? ` （¥${Number(route.cost).toLocaleString()}）` : ""}</p>
                                                       {(route.arrTime||route.arrPlace)&&<p style={{margin:0,fontSize:12}}>{route.arrTime||"--:--"} {route.arrPlace}</p>}
                                                     </div>
                                                   )) : <p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
+                                                  {routesCostSum(routes) > 0 && <p style={{margin:"4px 0 0",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>小計: ¥{routesCostSum(routes).toLocaleString()}</p>}
                                                 </div>
                                               );
                                             })}
@@ -1283,6 +1290,7 @@ export default function App() {
                                               <span style={{fontSize:14,fontWeight:500}}>
                                                 {s.depPlace||s.depAddress}{((s.depPlace||s.depAddress)&&(s.arrPlace||s.arrAddress))?" → ":""}{s.arrPlace||s.arrAddress}
                                               </span>
+                                              {s.budget&&<span style={{fontSize:13,color:GREEN,fontWeight:700}}>{fmt(s.budget)}</span>}
                                             </div>
                                             <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
                                               <span style={{fontSize:11,color:"#888"}}>{s.cat}{(s.moveMethod&&s.moveMethod!=="自由記述")?" · "+s.moveMethod:s.moveMethodFree?" · "+s.moveMethodFree:""}</span>
@@ -1303,7 +1311,10 @@ export default function App() {
                                         <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                                           <span style={{fontSize:13,color:"#888",fontWeight:500,minWidth:44,flexShrink:0}}>{s.time||"--:--"}</span>
                                           <div style={{flex:1}}>
-                                            <span style={{fontSize:14,fontWeight:500}}>{s.content}</span>
+                                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                                              <span style={{fontSize:14,fontWeight:500}}>{s.content}</span>
+                                              {s.budget&&<span style={{fontSize:13,color:GREEN,fontWeight:700}}>{fmt(s.budget)}</span>}
+                                            </div>
                                             {s.place&&<p style={{margin:"2px 0 0",fontSize:12,color:"#888"}}>{s.place}</p>}
                                             {(s.spotName||s.lat)&&(<a href={s.lat?`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.spotName)}`} target="_blank" rel="noreferrer" style={{fontSize:11,color:GREEN,textDecoration:"none",display:"block",marginTop:2}}>{s.spotName||"地図"} →Gマップ</a>)}
                                           </div>
@@ -1329,8 +1340,16 @@ export default function App() {
                             );
                           });
                         })()}
-                        <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee",display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15}}>
-                          <span>予算合計</span><span style={{color:GREEN}}>{fmt(budgetOf(selPlan.schedule||[]))}</span>
+                        <div style={{paddingTop:10,marginTop:6,borderTop:"2px solid #eee"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:15,marginBottom:4}}>
+                            <span>予算合計</span><span style={{color:GREEN}}>{fmt(budgetOf(selPlan.schedule||[]))}</span>
+                          </div>
+                          <div style={{display:"flex",gap:12}}>
+                            {["Nk","Ak"].map(u => {
+                              const cost = routesCostByPerson(selPlan.schedule, u.toLowerCase());
+                              return cost > 0 ? <span key={u} style={{fontSize:12,color:USER_COLORS[u],fontWeight:600}}>{u}: {fmt(cost)}</span> : null;
+                            })}
+                          </div>
                         </div>
                       </div>
                     </>
@@ -1419,7 +1438,7 @@ export default function App() {
                 const nkB = budgets[ys]?.Nk||0, akB = budgets[ys]?.Ak||0;
                 const yearlyBudget = (nkB+akB)*12;
                 const yearActual = dates.filter(d=>getY(d.date)===ys).reduce((s,d)=>s+totalOf(d.items||[]),0);
-                const yearPlanned = plans.filter(p=>p.status==="計画中"&&getY(p.date||"")===ys).reduce((s,p)=>s+budgetOf(p.schedule||[]),0);
+                const yearPlanned = plans.filter(p=>(p.status||"計画中")==="計画中"&&(getY(p.date||"")===ys||!p.date)).reduce((s,p)=>s+budgetOf(p.schedule||[]),0);
                 const saveBudget = (field,val)=>{
                   setLocalBudgetEdit(p=>({...p,[field]:val}));
                 };
@@ -1718,7 +1737,16 @@ export default function App() {
                     onGeocodeMove={npGeoSchedMove}
                     baseDate={npDate}
                   />
-                  <div style={{display:"flex",justifyContent:"flex-end",fontSize:14,fontWeight:700,color:GREEN,margin:"8px 0"}}>予算合計: {fmt(budgetOf(npSched))}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,margin:"8px 0",fontSize:13,fontWeight:700}}>
+                    <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:16}}>
+                      <span style={{fontSize:12,color:"#888",fontWeight:500}}>交通費:</span>
+                      <span style={{color:USER_COLORS.Nk}}>Nk: {fmt(routesCostByPerson(npSched, "nk"))}</span>
+                      <span style={{color:USER_COLORS.Ak}}>Ak: {fmt(routesCostByPerson(npSched, "ak"))}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"flex-end",fontSize:14}}>
+                      <span style={{color:GREEN}}>予算合計: {fmt(budgetOf(npSched))}</span>
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -1781,9 +1809,9 @@ export default function App() {
                 </>
               )}
             </div>
-            <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10}}>
-              <button onClick={()=>{setShowAddPlan(false);setEditPlanId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>キャンセル</button>
-              <button onClick={savePlan} disabled={saving} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>{saving?"保存中...":(editPlanId?"更新":"保存")}</button>
+            <div style={{padding:"0.75rem 1.25rem 2rem",borderTop:"1px solid #eee",flexShrink:0,display:"flex",gap:10,position:"relative",zIndex:10,background:"#fff"}}>
+              <button type="button" onClick={()=>{setShowAddPlan(false);setEditPlanId(null);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"#fff",cursor:"pointer",pointerEvents:"auto"}}>キャンセル</button>
+              <button type="button" onClick={()=>{console.log("savePlan clicked");savePlan();}} disabled={saving} style={{flex:1,padding:12,borderRadius:10,border:"none",background:GREEN,color:"#fff",fontWeight:700,cursor:"pointer",opacity:saving?0.7:1,pointerEvents:"auto"}}>{saving?"保存中...":(editPlanId?"更新":"保存")}</button>
             </div>
           </div>
         </div>
