@@ -316,55 +316,45 @@ function SpotEditor({ spots, onUpdate, onGeocode, onAdd, onRemove, onMove }) {
   );
 }
 
-// ★ ScheduleEditor を全面刷新
-function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, onGeocodeMove, baseDate }) {
-  const dayOptions = Array.from({length:7}, (_,i) => {
-    if (!baseDate) return { value: i, label: `${i+1}日目` };
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() + i);
-    const m = d.getMonth()+1, day = d.getDate();
-    return { value: i, label: `${i+1}日目（${m}/${day}）` };
-  });
-
-  const timeSelects = (value, onChange, step1min=false) => {
-    const hVal = value ? value.split(":")[0] : "";
-    const mVal = value ? value.split(":")[1]||"00" : "";
-    const mins = step1min
-      ? Array.from({length:60},(_,i)=>String(i).padStart(2,"0"))
-      : ["00","15","30","45"];
-    return (
-      <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
-        <select value={hVal} onChange={e=>{const m=mVal||"00";onChange(e.target.value?`${e.target.value}:${m}`:"");}}
-          style={{...SI,width:52,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
-          <option value="">--</option>
-          {Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,"0")}>{String(i).padStart(2,"0")}</option>)}
-        </select>
-        <span style={{fontSize:13,color:"#888"}}>:</span>
-        <select value={mVal||""} onChange={e=>{const h=hVal||"00";onChange(hVal||e.target.value?`${h}:${e.target.value}`:"");}}
-          style={{...SI,width:step1min?52:50,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
-          {!step1min&&<option value="">--</option>}
-          {mins.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
-      </div>
-    );
-  };
-
-  // 移動手段セレクト（自由記述対応）
-  const MoveMethodSelect = ({ value, freeValue, onChangeMethod, onChangeFree }) => (
-    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-      <select value={value||"電車"} onChange={e=>onChangeMethod(e.target.value)}
-        style={{...SI,padding:"7px 6px"}}>
-        {MOVE_METHODS.map(m=><option key={m}>{m}</option>)}
+// ★ schedule/route 共通コンポーネント (リマウント防止のためScheduleEditor外に定義)
+const timeSelects = (value, onChange, step1min=false) => {
+  const hVal = value ? value.split(":")[0] : "";
+  const mVal = value ? value.split(":")[1]||"00" : "";
+  const mins = step1min
+    ? Array.from({length:60},(_,i)=>String(i).padStart(2,"0"))
+    : ["00","15","30","45"];
+  return (
+    <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
+      <select value={hVal} onChange={e=>{const m=mVal||"00";onChange(e.target.value?`${e.target.value}:${m}`:"");}}
+        style={{...SI,width:52,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
+        <option value="">--</option>
+        {Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,"0")}>{String(i).padStart(2,"0")}</option>)}
       </select>
-      {value==="自由記述" && (
-        <input value={freeValue||""} onChange={e=>onChangeFree(e.target.value)}
-          placeholder="移動手段を入力" style={{...SI,flex:1,minWidth:80}}/>
-      )}
+      <span style={{fontSize:13,color:"#888"}}>:</span>
+      <select value={mVal||""} onChange={e=>{const h=hVal||"00";onChange(hVal||e.target.value?`${h}:${e.target.value}`:"");}}
+        style={{...SI,width:step1min?52:50,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
+        {!step1min&&<option value="">--</option>}
+        {mins.map(m=><option key={m} value={m}>{m}</option>)}
+      </select>
     </div>
   );
+};
 
+// 移動手段セレクト（自由記述対応）
+const MoveMethodSelect = ({ value, freeValue, onChangeMethod, onChangeFree }) => (
+  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+    <select value={value||"電車"} onChange={e=>onChangeMethod(e.target.value)}
+      style={{...SI,padding:"7px 6px"}}>
+      {MOVE_METHODS.map(m=><option key={m}>{m}</option>)}
+    </select>
+    {value==="自由記述" && (
+      <input value={freeValue||""} onChange={e=>onChangeFree(e.target.value)}
+        placeholder="移動手段を入力" style={{...SI,flex:1,minWidth:80}}/>
+    )}
+  </div>
+);
 
-// ── TransportPersonBlock（ScheduleEditorの外に定義・リマウント防止）──
+// ── TransportPersonBlock ──
 function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREEN, MOVE_METHODS }) {
   const routes = row[`${who}Routes`] || [makeRoute(`${who}-1`)];
   const updateRoute = (routeId, field, val) => {
@@ -376,26 +366,6 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
   const removeRoute = (routeId) => {
     const newRoutes = routes.filter(r => r.id !== routeId);
     onUpdateRoutes(newRoutes.length ? newRoutes : [makeRoute(`${who}-${Date.now()}`)]);
-  };
-  const hours = Array.from({length:24},(_,i)=>String(i).padStart(2,"0"));
-  const mins1 = Array.from({length:60},(_,i)=>String(i).padStart(2,"0"));
-  const timeSelects = (value, onChange) => {
-    const hVal = value ? value.split(":")[0] : "";
-    const mVal = value ? value.split(":")[1]||"00" : "";
-    return (
-      <div style={{display:"flex",gap:2,alignItems:"center",flexShrink:0}}>
-        <select value={hVal} onChange={e=>{const m=mVal||"00";onChange(e.target.value?`${e.target.value}:${m}`:"");}}
-          style={{...SI,width:52,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
-          <option value="">--</option>
-          {hours.map(h=><option key={h} value={h}>{h}</option>)}
-        </select>
-        <span style={{fontSize:13,color:"#888"}}>:</span>
-        <select value={mVal||""} onChange={e=>{const h=hVal||"00";onChange(hVal||e.target.value?`${h}:${e.target.value}`:"");}}
-          style={{...SI,width:52,padding:"7px 3px",boxSizing:"border-box",fontSize:13}}>
-          {mins1.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
-      </div>
-    );
   };
   return (
     <div style={{background:"#fff",borderRadius:8,padding:"10px 12px",border:`1px solid ${color}33`,marginBottom:10,boxSizing:"border-box"}}>
@@ -449,6 +419,16 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
     </div>
   );
 }
+
+// ★ ScheduleEditor を全面刷新
+function ScheduleEditor({ rows, onUpdate, onAdd, onRemove, onMove, onGeocode, onGeocodeMove, baseDate }) {
+  const dayOptions = Array.from({length:7}, (_,i) => {
+    if (!baseDate) return { value: i, label: `${i+1}日目` };
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + i);
+    const m = d.getMonth()+1, day = d.getDate();
+    return { value: i, label: `${i+1}日目（${m}/${day}）` };
+  });
 
   return (
     <div style={{width:"100%",minWidth:0}}>
@@ -1266,7 +1246,7 @@ export default function App() {
                                               const routes = s[`${who}Routes`]||[];
                                               const hasData = routes.some(r=>r.depTime||r.depPlace||r.arrTime||r.arrPlace);
                                               const moveIcon = (m) => {
-                                                const imap = {電車:"fa-solid fa-train",徒歩:"fa-solid fa-person-walking",車:"fa-solid fa-car","911":"fa-solid fa-car-side",飛行機:"fa-solid fa-plane",自由記述:"fa-solid fa-route"};
+                                                const imap = {電車:"fa-solid fa-train",徒歩:"fa-solid fa-person-walking",車:"fa-solid fa-car","911":"fa-solid fa-car-on",飛行機:"fa-solid fa-plane",自由記述:"fa-solid fa-route"};
                                                 return <i className={imap[m]||"fa-solid fa-train"}></i>;
                                               };
                                               return (
