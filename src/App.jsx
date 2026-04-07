@@ -1260,22 +1260,29 @@ export default function App() {
                                     <div key={s.id||i} style={{padding:"8px 0",borderBottom:!isLast?"1px solid #f0f0f0":"none"}}>
                                       {isTrans&&(
                                         <div>
-                                          <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}{s.content?" "+s.content:""}</p>
+                                          <p style={{margin:"0 0 6px",fontSize:13,fontWeight:700,color:"#555"}}>{s.cat}</p>
                                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                                             {[["nk","Nk"],["ak","Ak"]].map(([who,label])=>{
                                               const routes = s[`${who}Routes`]||[];
                                               const hasData = routes.some(r=>r.depTime||r.depPlace||r.arrTime||r.arrPlace);
+                                              const moveIcon = (m) => {
+                                                const imap = {電車:"fa-solid fa-train",徒歩:"fa-solid fa-person-walking",車:"fa-solid fa-car","911":"fa-solid fa-car-side",飛行機:"fa-solid fa-plane",自由記述:"fa-solid fa-route"};
+                                                return <i className={imap[m]||"fa-solid fa-train"}></i>;
+                                              };
                                               return (
-                                                <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"8px 10px"}}>
-                                                  <p style={{margin:"0 0 4px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
+                                                <div key={who} style={{background:"#f7f7f7",borderRadius:8,padding:"6px 8px"}}>
+                                                  <p style={{margin:"0 0 3px",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>{label}</p>
                                                   {hasData ? routes.map((route,ri)=>(
-                                                    <div key={route.id||ri} style={{borderTop:ri>0?"1px dashed #eee":"none",paddingTop:ri>0?4:0,marginTop:ri>0?4:0}}>
-                                                      {(route.depTime||route.depPlace)&&<p style={{margin:"0 0 1px",fontSize:12}}>{route.depTime||"--:--"} {route.depPlace}</p>}
-                                                      <p style={{margin:"0 0 1px",fontSize:11,color:"#bbb"}}>↓ {route.moveMethod==="自由記述"?route.moveMethodFree||"":route.moveMethod||""}{route.cost ? ` （¥${Number(route.cost).toLocaleString()}）` : ""}</p>
-                                                      {(route.arrTime||route.arrPlace)&&<p style={{margin:0,fontSize:12}}>{route.arrTime||"--:--"} {route.arrPlace}</p>}
+                                                    <div key={route.id||ri} style={{display:"flex",alignItems:"baseline",gap:4,flexWrap:"wrap",borderTop:ri>0?"1px dashed #eee":"none",paddingTop:ri>0?4:0,marginTop:ri>0?4:0,lineHeight:1.4}}>
+                                                      <span style={{fontSize:12,fontWeight:600,flexShrink:0}}>{route.depTime||""}</span>
+                                                      <span style={{fontSize:13,fontWeight:600,color:"#333"}}>{route.depPlace||""}</span>
+                                                      <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>→</span>
+                                                      <span style={{fontSize:11,color:"#999",flexShrink:0}}>{route.arrTime||""}</span>
+                                                      <span style={{fontSize:12,color:"#999"}}>{route.arrPlace||""}</span>
+                                                      {(route.moveMethod||route.cost) && <span style={{fontSize:11,color:"#bbb",marginLeft:4,flexShrink:0}}>{moveIcon(route.moveMethod||"電車")}{route.cost?` ¥${Number(route.cost).toLocaleString()}`:""}</span>}
                                                     </div>
-                                                  )) : <p style={{margin:0,fontSize:12,color:"#bbb"}}>未入力</p>}
-                                                  {routesCostSum(routes) > 0 && <p style={{margin:"4px 0 0",fontSize:11,fontWeight:700,color:USER_COLORS[label]}}>小計: ¥{routesCostSum(routes).toLocaleString()}</p>}
+                                                  )) : <p style={{margin:0,fontSize:11,color:"#bbb"}}>未入力</p>}
+                                                  {routesCostSum(routes) > 0 && <p style={{margin:"3px 0 0",fontSize:10,fontWeight:700,color:USER_COLORS[label],textAlign:"right"}}>小計: ¥{routesCostSum(routes).toLocaleString()}</p>}
                                                 </div>
                                               );
                                             })}
