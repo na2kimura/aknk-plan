@@ -379,7 +379,8 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
             </div>
           )}
           <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:5}}>
-            {timeSelects(route.depTime||"", v=>updateRoute(route.id,"depTime",v), true)}
+            <input type="time" key={route.id+"-depT"} defaultValue={route.depTime||""} onBlur={e=>updateRoute(route.id,"depTime",e.target.value)}
+              style={{...SI,width:90,padding:"7px 6px",boxSizing:"border-box",fontSize:13}}/>
             <input key={route.id+"-dep"} defaultValue={route.depPlace||""} onBlur={e=>updateRoute(route.id,"depPlace",e.target.value)}
               placeholder="出発地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
           </div>
@@ -394,11 +395,10 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
             )}
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            {timeSelects(route.arrTime||"", v=>updateRoute(route.id,"arrTime",v), true)}
-            {ri === routes.length - 1 && (
-              <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
-                placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
-            )}
+            <input type="time" key={route.id+"-arrT"} defaultValue={route.arrTime||""} onBlur={e=>updateRoute(route.id,"arrTime",e.target.value)}
+              style={{...SI,width:90,padding:"7px 6px",boxSizing:"border-box",fontSize:13}}/>
+            <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
+              placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:3,marginTop:5,paddingLeft:4}}>
             <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>金額 ¥</span>
