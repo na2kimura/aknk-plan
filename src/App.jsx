@@ -379,7 +379,7 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
             </div>
           )}
           <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:5}}>
-            {timeSelects(route.depTime||"", v=>updateRoute(route.id,"depTime",v))}
+            {timeSelects(route.depTime||"", v=>updateRoute(route.id,"depTime",v), true)}
             <input key={route.id+"-dep"} defaultValue={route.depPlace||""} onBlur={e=>updateRoute(route.id,"depPlace",e.target.value)}
               placeholder="出発地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
           </div>
@@ -394,7 +394,7 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
             )}
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            {timeSelects(route.arrTime||"", v=>updateRoute(route.id,"arrTime",v))}
+            {timeSelects(route.arrTime||"", v=>updateRoute(route.id,"arrTime",v), true)}
             {ri === routes.length - 1 && (
               <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
                 placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
