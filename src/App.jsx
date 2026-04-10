@@ -397,8 +397,13 @@ function TransportPersonBlock({ row, who, label, color, onUpdateRoutes, SI, GREE
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
             <input type="time" key={route.id+"-arrT"} defaultValue={route.arrTime||""} onBlur={e=>updateRoute(route.id,"arrTime",e.target.value)}
               style={{...SI,width:90,padding:"7px 6px",boxSizing:"border-box",fontSize:13}}/>
-            <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
-              placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
+            {ri < routes.length - 1 && routes[ri+1]?.depPlace && (
+              <span style={{fontSize:12,color:"#999",flex:1}}>{routes[ri+1].depPlace}</span>
+            )}
+            {ri === routes.length - 1 && (
+              <input key={route.id+"-arr"} defaultValue={route.arrPlace||""} onBlur={e=>updateRoute(route.id,"arrPlace",e.target.value)}
+                placeholder="到着地" style={{...SI,flex:1,minWidth:0,boxSizing:"border-box"}}/>
+            )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:3,marginTop:5,paddingLeft:4}}>
             <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>金額 ¥</span>
@@ -1258,7 +1263,7 @@ export default function App() {
                                                       <span style={{fontSize:13,fontWeight:600,color:"#333"}}>{route.depPlace||""}</span>
                                                       <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>→</span>
                                                       <span style={{fontSize:11,color:"#999",flexShrink:0}}>{route.arrTime||""}</span>
-                                                      <span style={{fontSize:12,color:"#999"}}>{route.arrPlace||""}</span>
+                                                      <span style={{fontSize:12,color:"#999"}}>{route.arrPlace || (ri < routes.length - 1 && routes[ri+1]?.depPlace ? routes[ri+1].depPlace : "")}</span>
                                                       {(route.moveMethod||route.cost) && <span style={{fontSize:11,color:"#bbb",marginLeft:4,flexShrink:0}}>{moveIcon(route.moveMethod||"電車")}{route.cost?` ¥${Number(route.cost).toLocaleString()}`:""}</span>}
                                                     </div>
                                                   )) : <p style={{margin:0,fontSize:11,color:"#bbb"}}>未入力</p>}
